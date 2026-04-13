@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # main.py
 from flask import Flask, jsonify
 import time
