@@ -1,0 +1,13 @@
+---
+# docker-compose.yaml
+version: '3.8'
+
+services:
+  openclaw:
+    image: openclaw/openclaw:latest
+    container_name: openclaw
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    env_file:
+      - .env
