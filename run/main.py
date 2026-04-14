@@ -1,39 +1,42 @@
 #!/usr/bin/env python3
 # main.py
-from flask import Flask, jsonify
-import time
 import os
+import time
 import redis
-import threading
+from flask import Flask, jsonify
 
 app = Flask(__name__)
-redis_client = redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/0'), decode_responses=True)
 mode = os.getenv('MODE', 'api')
 
+# Connect to Redis
+redis_client = redis.from_url(
+    os.getenv('REDIS_URL', 'redis://localhost:6379/0'), 
+    decode_responses=True
+)
+
 def run_agent():
-    """Single trading agent loop"""
+    """Trading logic loop"""
+    print("🚀 OpenClaw Agent Started...")
     while True:
-        # Your trading logic here - only ONE instance runs this
-        print("Agent tick...")
+        # Example: Log a heartbeat to Redis so the API knows the agent is alive
+        redis_client.set("agent_heartbeat", time.time())
         time.sleep(60)
 
 @app.route('/')
 def index():
     visits = redis_client.incr('visits')
-    return jsonify({"service": "openclaw", "mode": mode, "visits": visits})
+    last_beat = redis_client.get("agent_heartbeat")
+    return jsonify({
+        "service": "openclaw",
+        "mode": mode,
+        "agent_alive": last_beat,
+        "visits": visits
+    })
 
-@app.route('/health')
-def health():
-    try:
-        redis_client.ping()
-        return jsonify({"status": "healthy", "mode": mode, "timestamp": time.time()})
-    except:
-        return jsonify({"status": "unhealthy", "mode": mode}), 500
-
+# This logic handles the "MODE" branching
 if __name__ == "__main__":
     if mode == 'agent':
-        # Agent mode: no web server, just the trading loop
         run_agent()
     else:
-        # API mode: web server only, no trading logic
+        # This only runs if you do 'python main.py' manually
         app.run(host="0.0.0.0", port=80)
