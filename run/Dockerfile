@@ -11,4 +11,4 @@ COPY dos/rundos.sh .
 
 EXPOSE 80
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--workers", "4"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:80", "main:app"]
