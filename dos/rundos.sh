@@ -1,50 +1,68 @@
 #!/bin/bash
+
 # dos/rundos.sh
 set -e
 
 # ===================== CONFIG =====================
-if [ -f "/home/openclaw/openclaw/.env" ]; then
-    export $(cat /home/openclaw/openclaw/.env | xargs)
-fi
-
-DOCKER_HUB_USER="${DOCKER_HUB_USER:-openclaw}"
-DOCKER_IMAGE="${DOCKER_HUB_USER}/openclaw:latest"
-COMPOSE_FILE="docker-compose.yml"
 APP_DIR="/home/openclaw/openclaw"
+COMPOSE_FILE="docker-compose.yml"
 
 # ===================== FUNCTIONS =====================
-check_prerequisites() {
-    echo "→ Checking prerequisites..."
-    [ -z "$DOCKER_HUB_USER" ] && { echo "Error: DOCKER_HUB_USER is not set"; exit 1; }
-    command -v docker >/dev/null 2>&1 || { echo "Error: docker not found"; exit 1; }
-    command -v docker-compose >/dev/null 2>&1 || { echo "Error: docker-compose not found"; exit 1; }
+setup_environment() {
+    echo "→ Setting up environment..."
+    
+    cd "$APP_DIR" || { echo "Error: Directory $APP_DIR not found."; exit 1; }
+
+    # Safely load environment variables
+    if [ -f .env ]; then
+        echo "  └─ Loading .env file..."
+        set -a
+        source .env
+        set +a
+    else
+        echo "  └─ Warning: .env file not found."
+    fi
+
+    # Create persistence directories
+    echo "  └─ Ensuring directories exist (data/, logs/)..."
+    mkdir -p data logs
 }
 
-pull_and_deploy() {
-    echo "→ Pulling latest image: $DOCKER_IMAGE"
-    docker pull "$DOCKER_IMAGE"
+pull_latest_image() {
+    local hub_user="${DOCKER_HUB_USER:-openclaw}"
+    local image="${hub_user}/openclaw:latest"
 
-    echo "→ Deploying with docker-compose..."
-    docker-compose -f "$COMPOSE_FILE" up -d --force-recreate
+    echo "→ Pulling latest image: $image"
+    docker pull "$image"
 }
 
-show_status() {
-    echo "→ Deployment status:"
+deploy_services() {
+    echo "→ Deploying containers..."
+    docker-compose -f "$COMPOSE_FILE" pull  # Ensure latest
+    docker-compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
+}
+
+verify_status() {
+    echo "→ Waiting for services..."
+    sleep 3
+    
+    echo "→ Container Status:"
     docker-compose -f "$COMPOSE_FILE" ps
-    echo "→ Logs:"
+    
+    echo "→ Logs (last 20 lines):"
     docker-compose -f "$COMPOSE_FILE" logs --tail=20
 }
 
 # ===================== MAIN =====================
 main() {
     echo "=== OpenClaw Deployment Started ==="
-    cd "$APP_DIR"
+    
+    setup_environment
+    pull_latest_image
+    deploy_services
+    verify_status
 
-    check_prerequisites
-    pull_and_deploy
-    show_status
-
-    echo "=== Deployment completed successfully ==="
+    echo "=== Deployment completed ==="
 }
 
 main
