@@ -3,11 +3,47 @@
 version: '3.8'
 
 services:
-  openclaw:
-    image: openclaw/openclaw:latest
-    container_name: openclaw
+  openclaw-api:
+    image: ${DOCKER_HUB_USER}/openclaw:latest
+    container_name: openclaw-api
+    restart: always
     ports:
       - "80:80"
-    restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379/0
+      - MODE=api
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+
+  openclaw-agent:
+    image: ${DOCKER_HUB_USER}/openclaw:latest
+    container_name: openclaw-agent
+    command: python3 main.py  # Override Dockerfile CMD
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379/0
+      - MODE=agent
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: openclaw-redis
+    restart: always
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
