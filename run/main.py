@@ -5,23 +5,27 @@ import time
 import redis
 from flask import Flask, jsonify
 
-app = Flask(__name__)
+# 1. Global Setup (Shared by both modes)
 mode = os.getenv('MODE', 'api')
-
-# Connect to Redis
 redis_client = redis.from_url(
     os.getenv('REDIS_URL', 'redis://localhost:6379/0'), 
     decode_responses=True
 )
 
+# 2. Define the Flask App globally
+# This ensures Gunicorn ALWAYS finds "main:app" without crashing
+app = Flask(__name__)
+
 def run_agent():
     """Trading logic loop"""
-    print("🚀 OpenClaw Agent Started...")
+    print(f"🚀 OpenClaw Agent Started in {mode} mode...")
     while True:
-        # Example: Log a heartbeat to Redis so the API knows the agent is alive
+        # Your trading logic here
         redis_client.set("agent_heartbeat", time.time())
+        print("Agent tick: Heartbeat updated.")
         time.sleep(60)
 
+# 3. Define Routes (Always defined, but only used in API mode)
 @app.route('/')
 def index():
     visits = redis_client.incr('visits')
@@ -33,10 +37,19 @@ def index():
         "visits": visits
     })
 
-# This logic handles the "MODE" branching
+@app.route('/health')
+def health():
+    return jsonify({
+        "status": "healthy", 
+        "timestamp": time.time(),
+        "mode": mode
+    })
+
+# 4. The Execution Switch
 if __name__ == "__main__":
     if mode == 'agent':
+        # This runs when you call "python3 main.py" in the agent container
         run_agent()
     else:
-        # This only runs if you do 'python main.py' manually
+        # This runs for local dev/testing
         app.run(host="0.0.0.0", port=80)
