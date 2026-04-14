@@ -24,7 +24,7 @@ services:
   openclaw-agent:
     image: ${DOCKER_HUB_USER}/openclaw:latest
     container_name: openclaw-agent
-    command: python3 main.py  # Override Dockerfile CMD
+    command: python3 main.py
     restart: always
     env_file:
       - .env
