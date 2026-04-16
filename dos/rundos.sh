@@ -44,15 +44,17 @@ pull_latest_image() {
 
 deploy_services() {
     echo "→ Deploying..."
-    docker-compose -f "$COMPOSE_FILE" pull
-    docker-compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
+    # Changed from docker-compose to docker compose
+    docker compose -f "$COMPOSE_FILE" pull
+    docker compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
 }
 
 verify_status() {
     echo "→ Waiting..."
     sleep 3
-    docker-compose ps
-    docker-compose logs --tail=20
+    # Changed from docker-compose to docker compose
+    docker compose ps
+    docker compose logs --tail=20
 }
 
 main() {
