@@ -7,33 +7,31 @@ APP_DIR="/home/openclaw/openclaw"
 COMPOSE_FILE="docker-compose.yml"
 
 setup_environment() {
-    echo "→ Initializing Deployment Directory..."
+    echo "→ Synchronizing Environment..."
 
-    if [ ! -d "$APP_DIR" ]; then
-        echo "  └─ Creating $APP_DIR..."
-        mkdir -p "$APP_DIR"
-    fi
+    # Ensure we are in the right place
+    mkdir -p "$APP_DIR"
+    cd "$APP_DIR" || exit 1
+
+    # Fallback values
+    local DEFAULT_USER="openclaw"
+    local DEFAULT_REDIS="redis://redis:6379/0"
+
+    # Merge Logic: 
+    # Use $DOCKER_HUB_USER (passed from GitHub)
+    # OR Use existing .env value
+    # OR Use the Fallback
     
-    cd "$APP_DIR" || { echo "❌ Critical: Could not access $APP_DIR"; exit 1; }
+    # Load current .env if it exists
+    [ -f .env ] && source .env
 
-    local FALLBACK_USER="openclaw"
-    local FALLBACK_REDIS="redis://redis:6379/0"
-
-    if [ -f .env ]; then
-        echo "  └─ Loading existing .env..."
-        set -a
-        source .env
-        set +a
-    fi
-
-    # Write .env (GitHub env vars take priority via ${VAR:-fallback})
     {
-        echo "DOCKER_HUB_USER=${DOCKER_HUB_USER:-$FALLBACK_USER}"
-        echo "REDIS_URL=${REDIS_URL:-$FALLBACK_REDIS}"
+        echo "DOCKER_HUB_USER=${DOCKER_HUB_USER:-${DOCKER_HUB_USER:-$DEFAULT_USER}}"
+        echo "REDIS_URL=${REDIS_URL:-${REDIS_URL:-$DEFAULT_REDIS}}"
         echo "PYTHONUNBUFFERED=1"
     } > .env
 
-    echo "  └─ Creating volume directories..."
+    echo "  └─ Environment set. (User: ${DOCKER_HUB_USER:-$DEFAULT_USER})"
     mkdir -p data logs
 }
 
