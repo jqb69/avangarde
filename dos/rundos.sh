@@ -9,38 +9,31 @@ COMPOSE_FILE="docker-compose.yml"
 setup_environment() {
     echo "→ Initializing Deployment Directory..."
 
-    # 1. Create the directory if it's missing (The "First-Run" fix)
     if [ ! -d "$APP_DIR" ]; then
-        echo "  └─ Directory $APP_DIR not found. Creating it now..."
+        echo "  └─ Creating $APP_DIR..."
         mkdir -p "$APP_DIR"
     fi
     
     cd "$APP_DIR" || { echo "❌ Critical: Could not access $APP_DIR"; exit 1; }
 
-    # 2. Define Fallbacks (Priority: GitHub Secret > Existing .env > Fallback)
     local FALLBACK_USER="openclaw"
     local FALLBACK_REDIS="redis://redis:6379/0"
-    local FALLBACK_MODE="api"
 
-    # 3. Load existing .env if it exists to preserve manual tweaks
     if [ -f .env ]; then
-        echo "  └─ Existing .env found. Merging values..."
+        echo "  └─ Loading existing .env..."
         set -a
         source .env
         set +a
     fi
 
-    # 4. Generate/Update .env with current variables or fallbacks
-    # This uses the ${VAR:-DEFAULT} logic you wanted
+    # Write .env (GitHub env vars take priority via ${VAR:-fallback})
     {
         echo "DOCKER_HUB_USER=${DOCKER_HUB_USER:-$FALLBACK_USER}"
         echo "REDIS_URL=${REDIS_URL:-$FALLBACK_REDIS}"
-        echo "MODE=${MODE:-$FALLBACK_MODE}"
         echo "PYTHONUNBUFFERED=1"
     } > .env
 
-    # 5. Create sub-directories for Docker Volumes
-    echo "  └─ Ensuring volume directories exist..."
+    echo "  └─ Creating volume directories..."
     mkdir -p data logs
 }
 
@@ -52,17 +45,15 @@ pull_latest_image() {
 }
 
 deploy_services() {
-    echo "→ Deploying containers..."
+    echo "→ Deploying..."
     docker-compose -f "$COMPOSE_FILE" pull
     docker-compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
 }
 
 verify_status() {
-    echo "→ Waiting for services..."
+    echo "→ Waiting..."
     sleep 3
-    echo "→ Container Status:"
     docker-compose ps
-    echo "→ Logs:"
     docker-compose logs --tail=20
 }
 
@@ -72,7 +63,7 @@ main() {
     pull_latest_image
     deploy_services
     verify_status
-    echo "=== Deployment completed ==="
+    echo "=== Completed ==="
 }
 
 main
