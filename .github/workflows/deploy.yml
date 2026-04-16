@@ -9,6 +9,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: avanenv  # <--- GitHub now pulls secrets from 'avanenv' scope
     steps:
     - uses: actions/checkout@v4
 
@@ -42,6 +43,7 @@ jobs:
         context: .
         file: ./run/Dockerfile
         push: true
+        # Using the secret defined in avanenv
         tags: ${{ secrets.DOCKER_USERNAME }}/openclaw:latest
 
     - name: Copy files to server
@@ -60,15 +62,16 @@ jobs:
         host: ${{ secrets.DIGITAL_OCEAN_IP }}
         username: ${{ secrets.DIGITAL_OCEAN_USER }}
         key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-        # Bridge: Pass these from the runner environment to the remote server
+        # Bridge: Carries these variables over the SSH tunnel
         envs: DOCKER_HUB_USER, REDIS_URL
         script: |
+          # The "Non-Presumptuous" Path Check
           mkdir -p /home/openclaw/openclaw
           cd /home/openclaw/openclaw
           chmod +x dos/rundos.sh
           ./dos/rundos.sh
       env:
-        # Mapping: This is where we bridge your Secret to the variable the script wants
+        # Translator: secret DOCKER_USERNAME -> script DOCKER_HUB_USER
         DOCKER_HUB_USER: ${{ secrets.DOCKER_USERNAME }}
         REDIS_URL: ${{ secrets.REDIS_URL }}
 
