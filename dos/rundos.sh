@@ -16,6 +16,13 @@ setup_environment() {
     # Fallback values
     local DEFAULT_USER="openclaw"
     local DEFAULT_REDIS="redis://redis:6379/0"
+    echo "🔍 Validating core infrastructure..."
+
+    # CHECK FOR GROQ API KEY
+    if [ -z "${GROQ_API_KEY}" ]; then
+        echo "❌ FATAL: GROQ_API_KEY is missing. Sniper cannot think without a brain."
+        exit 1
+    fi
 
     # Merge Logic: 
     # Use $DOCKER_HUB_USER (passed from GitHub)
@@ -29,6 +36,11 @@ setup_environment() {
         echo "DOCKER_HUB_USER=${DOCKER_HUB_USER:-${DOCKER_HUB_USER:-$DEFAULT_USER}}"
         echo "REDIS_URL=${REDIS_URL:-${REDIS_URL:-$DEFAULT_REDIS}}"
         echo "PYTHONUNBUFFERED=1"
+        echo "GROQ_API_KEY=${GROQ_API_KEY}"
+        echo "ADMIN_API_KEY=${ADMIN_API_KEY}"
+        echo "TG_API_ID=${TG_API_ID}"
+        echo "TG_API_HASH=${TG_API_HASH}"
+        echo "TG_SESSION_STR=${TG_SESSION_STR}"
     } > .env
 
     echo "  └─ Environment set. (User: ${DOCKER_HUB_USER:-$DEFAULT_USER})"
