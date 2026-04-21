@@ -1,6 +1,6 @@
 ---
-# .github/deploy.yaml
-name: Deploy OpenClaw to Digital Ocean
+# .github/workflow/deploy.yml
+name: Deploy and Test OpenClaw
 
 on:
   push:
@@ -9,71 +9,68 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: avanenv  # <--- GitHub now pulls secrets from 'avanenv' scope
+    environment: avanenv
     steps:
     - uses: actions/checkout@v4
-
-    - name: Check secrets
-      env:
-        DIGITAL_OCEAN_IP: ${{ secrets.DIGITAL_OCEAN_IP }}
-        DIGITAL_OCEAN_USER: ${{ secrets.DIGITAL_OCEAN_USER }}
-        DIGITAL_OCEAN_SSH_KEY: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      run: |
-        [ -z "$DIGITAL_OCEAN_IP" ] && { echo "Error: DIGITAL_OCEAN_IP missing"; exit 1; }
-        [ -z "$DIGITAL_OCEAN_USER" ] && { echo "Error: DIGITAL_OCEAN_USER missing"; exit 1; }
-        [ -z "$DIGITAL_OCEAN_SSH_KEY" ] && { echo "Error: DIGITAL_OCEAN_SSH_KEY missing"; exit 1; }
-        [ -z "$DOCKER_USERNAME" ] && { echo "Error: DOCKER_USERNAME missing"; exit 1; }
-        [ -z "$DOCKER_PASSWORD" ] && { echo "Error: DOCKER_PASSWORD missing"; exit 1; }
-        echo "All secrets OK."
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
+    - name: Setup Python
+      uses: actions/setup-python@v4
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        python-version: '3.11'
+    - name: Install Telethon
+      run: pip install telethon
 
-    - name: Build and push image
+    - name: Validate/Generate Telegram
+      id: tg_auth
+      continue-on-error: true
+      env:
+        TG_API_ID: ${{ secrets.TG_API_ID }}
+        TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        TG_SESSION_STR: ${{ secrets.TG_SESSION_STR }}
+      run: python run/validate_tg.py
+
+    - name: Archive Auth Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: tg-auth-report
+        path: tg_session_report.txt
+
+    - name: Fail if Auth Bad
+      if: steps.tg_auth.outcome == 'failure'
+      run: |
+        echo "❌ TELEGRAM AUTHENTICATION FAILED"
+        echo "Please download the 'tg-auth-report' from the summary tab."
+        exit 1
+
+    - name: Build & Push
       uses: docker/build-push-action@v5
       with:
-        context: .
-        file: ./run/Dockerfile
+        context: ./run
         push: true
-        # Using the secret defined in avanenv
         tags: ${{ secrets.DOCKER_USERNAME }}/openclaw:latest
 
-    - name: Copy files to server
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.DIGITAL_OCEAN_IP }}
-        username: ${{ secrets.DIGITAL_OCEAN_USER }}
-        key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-        source: "dos/rundos.sh,docker-compose.yml"
-        target: "/home/openclaw/openclaw/"
-        strip_components: 0
-
-    - name: Deploy on Digital Ocean
+    - name: Remote Deploy
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.DIGITAL_OCEAN_IP }}
         username: ${{ secrets.DIGITAL_OCEAN_USER }}
         key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-        # Bridge: Carries these variables over the SSH tunnel
-        envs: DOCKER_HUB_USER, REDIS_URL
+        # Standardized naming here
+        envs: >-
+          DOCKER_HUB_USER, REDIS_URL, GROQ_API_KEY, 
+          ADMIN_API_KEY, TG_API_ID, TG_API_HASH, TG_SESSION_STR
         script: |
-          # The "Non-Presumptuous" Path Check
-          mkdir -p /home/openclaw/openclaw
           cd /home/openclaw/openclaw
           chmod +x dos/rundos.sh
           ./dos/rundos.sh
       env:
-        # Translator: secret DOCKER_USERNAME -> script DOCKER_HUB_USER
         DOCKER_HUB_USER: ${{ secrets.DOCKER_USERNAME }}
         REDIS_URL: ${{ secrets.REDIS_URL }}
+        # MAP GITHUB SECRET TO THE REAL VAR NAME
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }} 
+        ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+        TG_API_ID: ${{ secrets.TG_API_ID }}
+        TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        TG_SESSION_STR: ${{ secrets.TG_SESSION_STR }}
 
   test:
     runs-on: ubuntu-latest
@@ -81,9 +78,13 @@ jobs:
     environment: avanenv
     steps:
     - uses: actions/checkout@v4
-    - name: Test OpenClaw
+    - name: Install Requests
+      run: pip install requests
+    - name: Test OpenClaw Connectivity
       env:
         DIGITAL_OCEAN_IP: ${{ secrets.DIGITAL_OCEAN_IP }}
+        ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
       run: |
-        pip install requests
-        python test/test_openclaw.py
+        # Wait for service to settle
+        sleep 10
+        python run/openclaw_test.py
