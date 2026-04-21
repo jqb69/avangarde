@@ -23,14 +23,33 @@ def run_logic():
         sys.exit(1)
 
     # STEP 1: VALIDATE EXISTING
-    if SESSION and len(SESSION) > 20:
+    if not SESSION:
+        print("❌ FAIL: TG_SESSION_STR is empty")
+        exit(1)
+        
+    session_str = SESSION.strip() # .strip() removes spaces/newlines
+
+    if not session_str:
+        print("❌ FAIL: TG_SESSION_STR is empty")
+        exit(1)
+    
+    # Log the length to debug (The string should be ~350+ chars)
+    print(f"DEBUG: Session string length is {len(session_str)}")
+    if len(session_str) > 20:
         try:
-            client = TelegramClient(StringSession(SESSION), int(API_ID), API_HASH)
-            client.connect()
-            if client.is_user_authorized():
-                log(f"✅ SESSION VALID: Connected as {client.get_me().first_name}")
-                sys.exit(0)
-            log("⚠️ SESSION EXPIRED: Attempting to generate new one...")
+            # Use the cleaned string
+            client = TelegramClient(StringSession(session_str), int(API_ID), API_HASH)
+            
+            # The 'with' block handles connect and disconnect automatically
+            with client:
+                if client.is_user_authorized():
+                    user = client.get_me()
+                    log(f"✅ SESSION VALID: Connected as {user.first_name}")
+                    # Create a success flag file for the workflow if needed
+                    with open(OUT_FILE, 'w') as f: f.write(session_str)
+                    sys.exit(0)
+                else:
+                    log("⚠️ SESSION EXPIRED: String is valid format but unauthorized.")
         except Exception as e:
             log(f"⚠️ VALIDATION FAILED: {e}")
 
