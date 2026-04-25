@@ -1,90 +1,69 @@
----
-# .github/workflow/deploy.yml
-name: Deploy and Test OpenClaw
+name: Deploy OpenClaw Sniper
 
 on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    environment: avanenv
-    steps:
-    - uses: actions/checkout@v4
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    - name: Install Telethon
-      run: pip install telethon
-
-    - name: Validate/Generate Telegram
-      id: tg_auth
-      continue-on-error: true
-      env:
-        TG_API_ID: ${{ secrets.TG_API_ID }}
-        TG_API_HASH: ${{ secrets.TG_API_HASH }}
-        TG_SESSION_STR: ${{ secrets.TG_SESSION_STR }}
-      run: python run/validate_tg.py
-
-    - name: Archive Auth Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: tg-auth-report
-        path: tg_session_report.txt
-
-    - name: Fail if Auth Bad
-      if: steps.tg_auth.outcome == 'failure'
-      run: |
-        echo "❌ TELEGRAM AUTHENTICATION FAILED"
-        echo "Please download the 'tg-auth-report' from the summary tab."
-        exit 1
-
-    - name: Build & Push
-      uses: docker/build-push-action@v5
-      with:
-        context: ./run
-        push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/openclaw:latest
-
-    - name: Remote Deploy
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.DIGITAL_OCEAN_IP }}
-        username: ${{ secrets.DIGITAL_OCEAN_USER }}
-        key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-        # Standardized naming here
-        envs: >-
-          DOCKER_HUB_USER, REDIS_URL, GROQ_API_KEY, 
-          ADMIN_API_KEY, TG_API_ID, TG_API_HASH, TG_SESSION_STR
-        script: |
-          cd /home/openclaw/openclaw
-          chmod +x dos/rundos.sh
-          ./dos/rundos.sh
-      env:
-        DOCKER_HUB_USER: ${{ secrets.DOCKER_USERNAME }}
-        REDIS_URL: ${{ secrets.REDIS_URL }}
-        # MAP GITHUB SECRET TO THE REAL VAR NAME
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }} 
-        ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
-        TG_API_ID: ${{ secrets.TG_API_ID }}
-        TG_API_HASH: ${{ secrets.TG_API_HASH }}
-        TG_SESSION_STR: ${{ secrets.TG_SESSION_STR }}
-
   test:
     runs-on: ubuntu-latest
-    needs: deploy
-    environment: avanenv
     steps:
-    - uses: actions/checkout@v4
-    - name: Install Requests
-      run: pip install requests
-    - name: Test OpenClaw Connectivity
-      env:
-        DIGITAL_OCEAN_IP: ${{ secrets.DIGITAL_OCEAN_IP }}
-        ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
-      run: |
-        # Wait for service to settle
-        sleep 10
-        python run/openclaw_test.py
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run Tests
+        env:
+          TG_SESSION_STR: "test_mode"
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+          python -m pytest test_openclaw.py
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: SSH Deploy to DigitalOcean
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DIGITAL_OCEAN_IP }}
+          username: ${{ secrets.DIGITAL_OCEAN_USER }}
+          key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
+          envs: TG_SESSION_STR,TG_API_ID,TG_API_HASH
+          script: |
+            # Create a clean deployment environment
+            mkdir -p /home/${{ secrets.DIGITAL_OCEAN_USER }}/dos
+            
+            # Pass secrets to the remote script
+            export TG_SESSION_STR="${{ secrets.TG_SESSION_STR }}"
+            export TG_API_ID="${{ secrets.TG_API_ID }}"
+            export TG_API_HASH="${{ secrets.TG_API_HASH }}"
+            export IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
+            export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            export GH_ACTOR="${{ github.actor }}"
+
+            bash /home/${{ secrets.DIGITAL_OCEAN_USER }}/dos/rundos.sh
