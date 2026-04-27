@@ -1,81 +1,111 @@
 #!/bin/bash
+# do/rundos.sh
+# --- Global Settings ---
+# -e: Exit on error, -u: Error on unset vars, -o pipefail: Catch errors in pipes
+set -euo pipefail
 
-# dos/rundos.sh
-set -e
+# --- Configuration ---
+ENV_FILE=".env"
 
-APP_DIR="/home/openclaw/openclaw"
-COMPOSE_FILE="docker-compose.yml"
+# --- Functions ---
 
-setup_environment() {
-    echo "→ Synchronizing Environment..."
-
-    # Ensure we are in the right place
-    mkdir -p "$APP_DIR"
-    cd "$APP_DIR" || exit 1
-
-    # Fallback values
-    local DEFAULT_USER="openclaw"
-    local DEFAULT_REDIS="redis://redis:6379/0"
-    echo "🔍 Validating core infrastructure..."
-
-    # CHECK FOR GROQ API KEY
-    if [ -z "${GROQ_API_KEY}" ]; then
-        echo "❌ FATAL: GROQ_API_KEY is missing. Sniper cannot think without a brain."
-        exit 1
+load_env() {
+    echo "📂 Step 1: Handling Environment..."
+    
+    # If the .env file is missing, we build it from the variables 
+    # passed from the GitHub 'envs:' block.
+    if [ ! -f "$ENV_FILE" ]; then
+        echo "⚠️ .env not found. Creating from GitHub environment variables..."
+        {
+            echo "TG_SESSION_STR=${TG_SESSION_STR}"
+            echo "TG_API_ID=${TG_API_ID}"
+            echo "TG_API_HASH=${TG_API_HASH}"
+            echo "IMAGE_NAME=${IMAGE_NAME}"
+            echo "GH_TOKEN=${GH_TOKEN}"
+            echo "GH_ACTOR=${GH_ACTOR}"
+            echo "REDIS_URL=redis://127.0.0.1:6379/0"
+        } > "$ENV_FILE"
+        chmod 600 "$ENV_FILE"
+        echo "✅ .env created successfully."
+    else
+        echo "✅ Existing .env found. Using preserved session data."
     fi
 
-    # Merge Logic: 
-    # Use $DOCKER_HUB_USER (passed from GitHub)
-    # OR Use existing .env value
-    # OR Use the Fallback
+    # Load variables into the current shell session
+    set -a; source "$ENV_FILE"; set +a
+}
+
+check_system() {
+    echo "🔍 Step 2: System Integrity Check..."
     
-    # Load current .env if it exists
-    [ -f .env ] && source .env
-
-    {
-        echo "DOCKER_HUB_USER=${DOCKER_HUB_USER:-${DOCKER_HUB_USER:-$DEFAULT_USER}}"
-        echo "REDIS_URL=${REDIS_URL:-${REDIS_URL:-$DEFAULT_REDIS}}"
-        echo "PYTHONUNBUFFERED=1"
-        echo "GROQ_API_KEY=${GROQ_API_KEY}"
-        echo "ADMIN_API_KEY=${ADMIN_API_KEY}"
-        echo "TG_API_ID=${TG_API_ID}"
-        echo "TG_API_HASH=${TG_API_HASH}"
-        echo "TG_SESSION_STR=${TG_SESSION_STR}"
-    } > .env
-
-    echo "  └─ Environment set. (User: ${DOCKER_HUB_USER:-$DEFAULT_USER})"
-    mkdir -p data logs
+    # Check for Docker
+    if ! [ -x "$(command -v docker)" ]; then
+        echo "Docker not found. Installing..."
+        curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+    fi
+    
+    # Login to GHCR (required to pull the private image)
+    echo "🔑 Authenticating with GHCR..."
+    echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 }
 
-pull_latest_image() {
-    local hub_user="${DOCKER_HUB_USER:-openclaw}"
-    local image="${hub_user}/openclaw:latest"
-    echo "→ Pulling: $image"
-    docker pull "$image"
+deploy_redis() {
+    echo "🗄️ Step 3: Managing Redis..."
+    # Start Redis if not exists; restart if it does
+    docker run -d --name claw-redis --restart always -p 6379:6379 redis:alpine 2>/dev/null || docker start claw-redis
 }
 
-deploy_services() {
-    echo "→ Deploying..."
-    # Changed from docker-compose to docker compose
-    docker compose -f "$COMPOSE_FILE" pull
-    docker compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
+deploy_containers() {
+    echo "🚀 Step 4: Deploying OpenClaw..."
+    
+    # Always pull the latest image before restarting
+    docker pull "$IMAGE_NAME"
+
+    # --- Start Sniper Agent ---
+    echo "🎯 Refreshing Sniper Agent..."
+    docker stop openclaw-agent 2>/dev/null || true
+    docker rm openclaw-agent 2>/dev/null || true
+    docker run -d \
+      --name openclaw-agent \
+      --env MODE=agent \
+      --env-file "$ENV_FILE" \
+      --network host \
+      --restart unless-stopped \
+      "$IMAGE_NAME" python3 main.py
+
+    # --- Start Web API ---
+    echo "🌐 Refreshing Web API..."
+    docker stop openclaw-api 2>/dev/null || true
+    docker rm openclaw-api 2>/dev/null || true
+    docker run -d \
+      --name openclaw-api \
+      --env MODE=api \
+      --env-file "$ENV_FILE" \
+      --network host \
+      -p 80:80 \
+      --restart unless-stopped \
+      "$IMAGE_NAME" gunicorn -w 4 -b 0.0.0.0:80 main:app
 }
 
-verify_status() {
-    echo "→ Waiting..."
-    sleep 3
-    # Changed from docker-compose to docker compose
-    docker compose ps
-    docker compose logs --tail=20
+cleanup() {
+    echo "🧹 Step 5: Post-Deployment Cleanup..."
+    # Remove old images to save disk space on the Droplet
+    docker image prune -f
 }
+
+# --- Main Logic Loop ---
 
 main() {
-    echo "=== OpenClaw Deployment Started ==="
-    setup_environment
-    pull_latest_image
-    deploy_services
-    verify_status
-    echo "=== Completed ==="
+    echo "🏁 Starting Deployment..."
+    
+    load_env
+    check_system
+    deploy_redis
+    deploy_containers
+    cleanup
+    
+    echo "🎉 SUCCESS: OpenClaw Sniper and API are running."
 }
 
+# Execute main
 main
