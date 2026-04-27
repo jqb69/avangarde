@@ -48,6 +48,7 @@ jobs:
         with:
           context: .
           push: true
+          file: run/Dockerfile
           tags: ghcr.io/${{ github.repository }}:latest
           # Now these cache lines will actually work
           cache-from: type=gha
