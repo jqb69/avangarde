@@ -23,9 +23,9 @@ jobs:
         env:
           TG_SESSION_STR: "test_mode"
         run: |
-          pip install -r requirements.txt
-          pip install pytest
-          python -m pytest test_openclaw.py
+          pip install -r run/requirements.txt
+          pip install pytest pytest-asyncio
+          python -m pytest test/test_openclaw.py
 
   build-and-deploy:
     needs: test
