@@ -1,3 +1,5 @@
+---
+# .github/workflow/deploy.yml
 name: Deploy OpenClaw Sniper
 
 on:
@@ -49,21 +51,21 @@ jobs:
 
       - name: SSH Deploy to DigitalOcean
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          # Map secrets to env vars here
+          TG_SESSION_STR: ${{ secrets.TG_SESSION_STR }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_API_ID: "37419532"
+          IMAGE_NAME: "ghcr.io/${{ github.repository }}:latest"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.DIGITAL_OCEAN_IP }}
           username: ${{ secrets.DIGITAL_OCEAN_USER }}
           key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-          envs: TG_SESSION_STR,TG_API_ID,TG_API_HASH
+          # CRITICAL: Tell the action which env vars to export to the Droplet
+          envs: TG_SESSION_STR,TG_API_HASH,TG_API_ID,IMAGE_NAME,GH_TOKEN,GH_ACTOR
           script: |
-            # Create a clean deployment environment
-            mkdir -p /home/${{ secrets.DIGITAL_OCEAN_USER }}/dos
-            
-            # Pass secrets to the remote script
-            export TG_SESSION_STR="${{ secrets.TG_SESSION_STR }}"
-            export TG_API_ID="${{ secrets.TG_API_ID }}"
-            export TG_API_HASH="${{ secrets.TG_API_HASH }}"
-            export IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
-            export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-            export GH_ACTOR="${{ github.actor }}"
-
-            bash /home/${{ secrets.DIGITAL_OCEAN_USER }}/dos/rundos.sh
+            cd /home/${{ secrets.DIGITAL_OCEAN_USER }}/dos
+            chmod +x rundos.sh
+            bash rundos.sh
