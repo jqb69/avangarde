@@ -1,4 +1,22 @@
+# --- Core Telegram Engine ---
+Telethon==1.31.0
+cryptg>=0.4.0        # Telethon 10x speed boost (C-extensions)
+python-dotenv==1.0.1
+
+# --- Web Server (Dashboard / Health Checks) ---
 flask==3.0.0
 gunicorn==21.2.0
+
+# --- Database & Cache (Speed is everything) ---
 redis==5.0.1
+
+# --- API & Networking ---
 requests==2.31.0
+aiohttp==3.9.5
+
+# --- Image/QR Support ---
+qrcode[pil]==8.2
+pillow==10.3.0
+
+# --- Math & Logic ---
+numpy==1.26.4
