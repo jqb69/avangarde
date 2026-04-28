@@ -54,6 +54,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Copy deployment scripts to Droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DIGITAL_OCEAN_IP }}
+          username: ${{ secrets.DIGITAL_OCEAN_USER }}
+          key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
+          source: "dos/*"   # Copies everything inside your 'dos' folder
+          target: "~/dos"    # Places it in the 'dos' directory on the Droplet
+          strip_components: 1 # Removes the 'dos/' prefix so files land in ~/dos/
+
       - name: SSH Deploy to DigitalOcean
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -69,8 +79,6 @@ jobs:
           key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
           envs: TG_SESSION_STR,TG_API_HASH,TG_API_ID,IMAGE_NAME,GH_TOKEN,GH_ACTOR
           script: |
-            mkdir -p ~/dos
             cd ~/dos
-            # If rundos.sh isn't here yet, we need to make sure it exists 
-            chmod +x rundos.sh || echo "rundos.sh not found, check if it was uploaded"
+            chmod +x rundos.sh
             ./rundos.sh
