@@ -30,6 +30,7 @@ jobs:
   build-and-deploy:
     needs: test
     runs-on: ubuntu-latest
+    environment: avanenv
     steps:
       - uses: actions/checkout@v4
 
