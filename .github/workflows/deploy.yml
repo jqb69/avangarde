@@ -57,10 +57,9 @@ jobs:
       - name: SSH Deploy to DigitalOcean
         uses: appleboy/ssh-action@v1.0.3
         env:
-          # Map secrets to env vars here
           TG_SESSION_STR: ${{ secrets.TG_SESSION_STR }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
-          TG_API_ID: "37419532"
+          TG_API_ID: ${{ secrets.TG_API_ID }}
           IMAGE_NAME: "ghcr.io/${{ github.repository }}:latest"
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
@@ -68,9 +67,10 @@ jobs:
           host: ${{ secrets.DIGITAL_OCEAN_IP }}
           username: ${{ secrets.DIGITAL_OCEAN_USER }}
           key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-          # CRITICAL: Tell the action which env vars to export to the Droplet
           envs: TG_SESSION_STR,TG_API_HASH,TG_API_ID,IMAGE_NAME,GH_TOKEN,GH_ACTOR
           script: |
-            cd /home/${{ secrets.DIGITAL_OCEAN_USER }}/dos
-            chmod +x rundos.sh
-            bash rundos.sh
+            mkdir -p ~/dos
+            cd ~/dos
+            # If rundos.sh isn't here yet, we need to make sure it exists 
+            chmod +x rundos.sh || echo "rundos.sh not found, check if it was uploaded"
+            ./rundos.sh
