@@ -4,37 +4,34 @@ version: '3.8'
 
 services:
   openclaw-api:
-    image: ${DOCKER_HUB_USER}/openclaw:latest
+    # Use the image built from the local Dockerfile
+    build:
+      context: .
+      dockerfile: run/Dockerfile
     container_name: openclaw-api
     restart: always
     ports:
       - "80:80"
-    env_file:
-      - .env
+    env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://openclaw-redis:6379/0 # Use the container_name
       - MODE=api
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
     depends_on:
       - redis
 
   openclaw-agent:
-    image: ${DOCKER_HUB_USER}/openclaw:latest
+    build:
+      context: .
+      dockerfile: run/Dockerfile
     container_name: openclaw-agent
     command: python3 main.py
     restart: always
-    env_file:
-      - .env
+    env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://openclaw-redis:6379/0 # Use the container_name
       - MODE=agent
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
     depends_on:
       - redis
 
@@ -42,6 +39,9 @@ services:
     image: redis:7-alpine
     container_name: openclaw-redis
     restart: always
+    # Expose port so you can check it from the Droplet if needed
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
 
