@@ -7,15 +7,18 @@ set -euo pipefail
 # --- Configuration ---
 ENV_FILE=".env"
 
+
 # --- Functions ---
 
 load_env() {
     echo "📂 Step 1: Handling Environment..."
     
-    # If the .env file is missing, we build it from the variables 
-    # passed from the GitHub 'envs:' block.
+    # Lowercase the actor name for the image path
+    local ACTOR_LOWER=$(echo "$GH_ACTOR" | tr '[:upper:]' '[:lower:]')
+    export IMAGE_NAME="ghcr.io/${ACTOR_LOWER}/avangarde:latest"
+
     if [ ! -f "$ENV_FILE" ]; then
-        echo "⚠️ .env not found. Creating from GitHub environment variables..."
+        echo "⚠️ .env not found. Creating..."
         {
             echo "TG_SESSION_STR=${TG_SESSION_STR}"
             echo "TG_API_ID=${TG_API_ID}"
@@ -23,6 +26,7 @@ load_env() {
             echo "IMAGE_NAME=${IMAGE_NAME}"
             echo "GH_TOKEN=${GH_TOKEN}"
             echo "GH_ACTOR=${GH_ACTOR}"
+            # FOR HOST MODE, USE 127.0.0.1
             echo "REDIS_URL=redis://127.0.0.1:6379/0"
         } > "$ENV_FILE"
         chmod 600 "$ENV_FILE"
@@ -30,8 +34,8 @@ load_env() {
     else
         echo "✅ Existing .env found. Using preserved session data."
     fi
-
-    # Load variables into the current shell session
+    
+    # Export for Docker Compose to see
     set -a; source "$ENV_FILE"; set +a
 }
 
@@ -49,10 +53,20 @@ check_system() {
     echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 }
 
-deploy_redis() {
-    echo "🗄️ Step 3: Managing Redis..."
-    # Start Redis if not exists; restart if it does
-    docker run -d --name claw-redis --restart always -p 6379:6379 redis:alpine 2>/dev/null || docker start claw-redis
+
+
+
+deploy_openclaw() {
+    echo "🧹 Step 1: Cleaning up legacy manual containers..."
+    # Kill the manual ones that conflict with Compose
+    docker stop openclaw-agent openclaw-api claw-redis 2>/dev/null || true
+    docker rm openclaw-agent openclaw-api claw-redis 2>/dev/null || true
+
+    ecd "$(dirname "$0")/.." # Moves up from dos/ to the top-level
+    
+    echo "🏗️ Step 2: Orchestrating with Docker Compose..."
+    docker-compose pull
+    docker-compose up -d --remove-orphans --force-recreate
 }
 
 deploy_containers() {
@@ -100,10 +114,12 @@ main() {
     
     load_env
     check_system
-    deploy_redis
-    deploy_containers
+    #deploy_redis
+    deploy_openclaw
     cleanup
-    
+    echo "=============================================="
+    echo "🎉 SUCCESS: Compose stack is up and running."
+    echo "Check logs with: docker-compose logs -f"
     echo "🎉 SUCCESS: OpenClaw Sniper and API are running."
 }
 
