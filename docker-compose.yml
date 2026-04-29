@@ -4,44 +4,40 @@ version: '3.8'
 
 services:
   openclaw-api:
-    # Use the image built from the local Dockerfile
-    build:
-      context: .
-      dockerfile: run/Dockerfile
+    image: ${IMAGE_NAME}
     container_name: openclaw-api
     restart: always
-    ports:
-      - "80:80"
-    env_file: .env
+    # SPECIFIED: This puts the container directly on the Droplet network
+    network_mode: "host" 
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - REDIS_URL=redis://openclaw-redis:6379/0 # Use the container_name
       - MODE=api
-    depends_on:
-      - redis
+      # Since we are on host network, Redis is at localhost
+      - REDIS_URL=redis://127.0.0.1:6379/0
 
   openclaw-agent:
-    build:
-      context: .
-      dockerfile: run/Dockerfile
+    image: ${IMAGE_NAME}
     container_name: openclaw-agent
     command: python3 main.py
     restart: always
-    env_file: .env
+    # SPECIFIED: No virtual bridge, just raw speed
+    network_mode: "host"
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - REDIS_URL=redis://openclaw-redis:6379/0 # Use the container_name
       - MODE=agent
-    depends_on:
-      - redis
+      - REDIS_URL=redis://127.0.0.1:6379/0
 
   redis:
     image: redis:7-alpine
     container_name: openclaw-redis
     restart: always
-    # Expose port so you can check it from the Droplet if needed
-    ports:
-      - "6379:6379"
+    # MUST BE HOST MODE TOO
+    network_mode: "host" 
+    # 'ports' is useless in host mode, so we drop it to keep it clean
     volumes:
       - redis_data:/data
 
