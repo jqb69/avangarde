@@ -50,7 +50,7 @@ jobs:
           context: .
           push: true
           file: run/Dockerfile
-          tags: ghcr.io/${{ github.repository }}:latest
+          tags: ghcr.io/${{ github.repository_owner }}/avangarde:latest
           # Now these cache lines will actually work
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -71,7 +71,7 @@ jobs:
           TG_SESSION_STR: ${{ secrets.TG_SESSION_STR }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_API_ID: ${{ secrets.TG_API_ID }}
-          IMAGE_NAME: "ghcr.io/${{ github.repository }}:latest"
+          IMAGE_NAME: "ghcr.io/${{ github.repository_owner }}/avangarde:latest"
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
         with:
