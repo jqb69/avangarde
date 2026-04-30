@@ -4,7 +4,7 @@ name: Deploy OpenClaw Sniper
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
@@ -44,6 +44,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Validate Secrets
+        run: |
+          if [ -z "${{ secrets.DIGITAL_OCEAN_IP }}" ]; then echo "Missing IP"; exit 1; fi
+          if [ -z "${{ secrets.DIGITAL_OCEAN_SSH_KEY }}" ]; then echo "Missing SSH Key"; exit 1; fi
+          if [ -z "${{ secrets.TG_SESSION_STR }}" ]; then echo "Missing Telegram Session"; exit 1; fi
+          # Add others as needed
+
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
@@ -51,7 +58,6 @@ jobs:
           push: true
           file: run/Dockerfile
           tags: ghcr.io/${{ github.repository_owner }}/avangarde:latest
-          # Now these cache lines will actually work
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -61,9 +67,9 @@ jobs:
           host: ${{ secrets.DIGITAL_OCEAN_IP }}
           username: ${{ secrets.DIGITAL_OCEAN_USER }}
           key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-          source: "dos/*"   # Copies everything inside your 'dos' folder
-          target: "~/dos"    # Places it in the 'dos' directory on the Droplet
-          strip_components: 1 # Removes the 'dos/' prefix so files land in ~/dos/
+          source: "dos/*"
+          target: "~/dos"
+          strip_components: 1
 
       - name: SSH Deploy to DigitalOcean
         uses: appleboy/ssh-action@v1.0.3
@@ -72,7 +78,7 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_API_ID: ${{ secrets.TG_API_ID }}
           IMAGE_NAME: "ghcr.io/${{ github.repository_owner }}/avangarde:latest"
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           GH_ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.DIGITAL_OCEAN_IP }}
