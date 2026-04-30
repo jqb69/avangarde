@@ -42,27 +42,32 @@ load_env() {
 check_system() {
     echo "🔍 Step 2: System Integrity Check..."
     
-    # 1. Install Docker if missing
     if ! [ -x "$(command -v docker)" ]; then
         echo "Docker not found. Installing..."
         curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
     fi
     
-    # 2. Lowercase the actor for Docker login
+    # Force lowercase for login
     local LOGIN_USER=$(echo "$GH_ACTOR" | tr '[:upper:]' '[:lower:]')
     
-    # 3. Login to GHCR
     echo "🔑 Authenticating with GHCR as $LOGIN_USER..."
-    if [ -z "$GH_TOKEN" ]; then
-        echo "❌ Error: GH_TOKEN is empty. Check your GitHub Secrets."
+
+    # CRITICAL CHECK: Is the token actually here?
+    if [ -z "${GH_TOKEN:-}" ]; then
+        echo "❌ ERROR: GH_TOKEN is EMPTY or UNDEFINED."
+        echo "Check your GitHub Action 'envs' pass-through."
         exit 1
+    else
+        # Print the length of the token to verify it's not just a single character or empty
+        echo "✅ GH_TOKEN is present (Length: ${#GH_TOKEN} chars)."
     fi
+    
+    # The actual login
     echo "$GH_TOKEN" | docker login ghcr.io -u "$LOGIN_USER" --password-stdin
 }
 
 deploy_openclaw() {
     echo "🧹 Step 3: Cleaning up legacy manual containers..."
-    # Kill the manual ones that conflict with Compose
     docker stop openclaw-agent openclaw-api claw-redis 2>/dev/null || true
     docker rm openclaw-agent openclaw-api claw-redis 2>/dev/null || true
 
@@ -70,10 +75,7 @@ deploy_openclaw() {
     cd "$(dirname "$0")/.." 
     
     echo "🏗️ Step 4: Orchestrating with Docker Compose..."
-    # Force pull to ensure we have the latest GHCR image
     docker-compose pull
-    
-    # Start the stack
     docker-compose up -d --remove-orphans --force-recreate
 }
 
