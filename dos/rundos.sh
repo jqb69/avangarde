@@ -99,22 +99,27 @@ deploy_openclaw() {
     docker stop openclaw-agent openclaw-api claw-redis 2>/dev/null || true
     docker rm openclaw-agent openclaw-api claw-redis 2>/dev/null || true
 
-    # FIX: Corrected 'ecd' to 'cd'
+    # Move from ~/avangarde/dos up to ~/avangarde
     cd "$(dirname "$0")/.." 
     
-    echo "📍 Confirmed Working Directory: $(pwd)"
+    # DEFINE THE PATH HERE
+    # Since we just moved UP, the .env is now inside the 'dos' folder
+    local ENV_PATH="./dos/.env"
+
+    echo "📍 Working Directory: $(pwd)"
+    echo "📄 Using Env File: $ENV_PATH"
     
-    # Final check for the file before pull
-    if [ ! -f "docker-compose.yml" ]; then
-        echo "❌ FAILURE: docker-compose.yml still not found in $(pwd)"
-        ls -la
+    if [ ! -f "$ENV_PATH" ]; then
+        echo "❌ ERROR: .env not found at $ENV_PATH"
+        ls -la ./dos/
         exit 1
     fi
     
-    echo "🏗️ Step 4: Orchestrating with Docker Compose..."
-    # Use the variable we defined in check_system
-    $DOCKER_COMPOSE_CMD pull
-    $DOCKER_COMPOSE_CMD up -d --remove-orphans --force-recreate
+    echo "🏗️ Step 4: Orchestrating with $DOCKER_COMPOSE_CMD..."
+    
+    # You MUST pass the --env-file flag to both pull and up
+    $DOCKER_COMPOSE_CMD --env-file "$ENV_PATH" pull
+    $DOCKER_COMPOSE_CMD --env-file "$ENV_PATH" up -d --remove-orphans --force-recreate
 }
 
 deploy_containers() {
