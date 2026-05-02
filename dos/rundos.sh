@@ -102,6 +102,15 @@ deploy_openclaw() {
     # FIX: Corrected 'ecd' to 'cd'
     cd "$(dirname "$0")/.." 
     
+    echo "📍 Confirmed Working Directory: $(pwd)"
+    
+    # Final check for the file before pull
+    if [ ! -f "docker-compose.yml" ]; then
+        echo "❌ FAILURE: docker-compose.yml still not found in $(pwd)"
+        ls -la
+        exit 1
+    fi
+    
     echo "🏗️ Step 4: Orchestrating with Docker Compose..."
     # Use the variable we defined in check_system
     $DOCKER_COMPOSE_CMD pull
