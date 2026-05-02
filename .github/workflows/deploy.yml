@@ -86,6 +86,5 @@ jobs:
           key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
           envs: TG_SESSION_STR,TG_API_HASH,TG_API_ID,IMAGE_NAME,GH_TOKEN,GH_ACTOR
           script: |
-            cd ~/avangarde/dos
             chmod +x ~/avangarde/dos/rundos.sh
-            ./rundos.sh
+            ~/avangarde/dos/rundos.sh
