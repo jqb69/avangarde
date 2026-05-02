@@ -17,53 +17,59 @@ load_env() {
     local ACTOR_LOWER=$(echo "$GH_ACTOR" | tr '[:upper:]' '[:lower:]')
     export IMAGE_NAME="ghcr.io/${ACTOR_LOWER}/avangarde:latest"
 
-    if [ ! -f "$ENV_FILE" ]; then
-        echo "⚠️ .env not found. Creating..."
-        {
-            echo "TG_SESSION_STR=${TG_SESSION_STR}"
-            echo "TG_API_ID=${TG_API_ID}"
-            echo "TG_API_HASH=${TG_API_HASH}"
-            echo "IMAGE_NAME=${IMAGE_NAME}"
-            echo "GH_TOKEN=${GH_TOKEN}"
-            echo "GH_ACTOR=${GH_ACTOR}"
-            # FOR HOST MODE, USE 127.0.0.1
-            echo "REDIS_URL=redis://127.0.0.1:6379/0"
-        } > "$ENV_FILE"
-        chmod 600 "$ENV_FILE"
-        echo "✅ .env created successfully."
-    else
-        echo "✅ Existing .env found. Using preserved session data."
-    fi
+    # STRIP HIDDEN CHARACTERS from the token immediately
+    CLEAN_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')
+
+    echo "🔄 Overwriting .env with fresh secrets..."
+    {
+        echo "TG_SESSION_STR=${TG_SESSION_STR}"
+        echo "TG_API_ID=${TG_API_ID}"
+        echo "TG_API_HASH=${TG_API_HASH}"
+        echo "IMAGE_NAME=${IMAGE_NAME}"
+        echo "GH_TOKEN=${CLEAN_TOKEN}"
+        echo "GH_ACTOR=${GH_ACTOR}"
+        echo "REDIS_URL=redis://127.0.0.1:6379/0"
+    } > "$ENV_FILE"
     
-    # Export for Docker Compose to see
+    chmod 600 "$ENV_FILE"
+    echo "✅ .env updated successfully."
+    
+    # Export for current shell and Docker Compose
     set -a; source "$ENV_FILE"; set +a
 }
 
 check_system() {
     echo "🔍 Step 2: System Integrity Check..."
     
-    if ! [ -x "$(command -v docker)" ]; then
-        echo "Docker not found. Installing..."
-        curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
-    fi
+    # 1. STRIP EVERYTHING: Remove potential hidden spaces/newlines from the secret
+    # Sometimes copying from the browser adds a trailing newline
+    CLEAN_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')
     
-    # Force lowercase for login
-    local LOGIN_USER=$(echo "$GH_ACTOR" | tr '[:upper:]' '[:lower:]')
-    
-    echo "🔑 Authenticating with GHCR as $LOGIN_USER..."
+    # 2. Get lowercased names
+    local ACTOR_LC=$(echo "$GH_ACTOR" | tr '[:upper:]' '[:lower:]')
+    local OWNER_LC=$(echo "jqb69" | tr '[:upper:]' '[:lower:]')
 
-    # CRITICAL CHECK: Is the token actually here?
-    if [ -z "${GH_TOKEN:-}" ]; then
-        echo "❌ ERROR: GH_TOKEN is EMPTY or UNDEFINED."
-        echo "Check your GitHub Action 'envs' pass-through."
-        exit 1
-    else
-        # Print the length of the token to verify it's not just a single character or empty
-        echo "✅ GH_TOKEN is present (Length: ${#GH_TOKEN} chars)."
-    fi
+    echo "🔑 Attempting Multi-Stage Authentication..."
+
+    # Attempt 1: Using the Actor (jqb69)
+    if echo "$CLEAN_TOKEN" | docker login ghcr.io -u "$ACTOR_LC" --password-stdin 2>/dev/null; then
+        echo "✅ SUCCESS: Authenticated as $ACTOR_LC"
     
-    # The actual login
-    echo "$GH_TOKEN" | docker login ghcr.io -u "$LOGIN_USER" --password-stdin
+    # Attempt 2: Using the Owner name directly
+    elif echo "$CLEAN_TOKEN" | docker login ghcr.io -u "$OWNER_LC" --password-stdin 2>/dev/null; then
+        echo "✅ SUCCESS: Authenticated as $OWNER_LC"
+
+    # Attempt 3: The 'Secret' Trick (Using the token AS the username)
+    # Some registries allow the PAT as the username if the scope is dedicated
+    elif echo "$CLEAN_TOKEN" | docker login ghcr.io -u "$CLEAN_TOKEN" --password-stdin 2>/dev/null; then
+        echo "✅ SUCCESS: Authenticated via Token-String"
+
+    else
+        echo "❌ FATAL: All login attempts denied."
+        echo "DEBUG: Token length is ${#CLEAN_TOKEN}. If this is 40, the token is technically valid."
+        echo "This usually means the PAT wasn't RE-SAVED after the Package Admin was set."
+        exit 1
+    fi
 }
 
 deploy_openclaw() {
