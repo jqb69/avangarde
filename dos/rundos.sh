@@ -49,6 +49,28 @@ check_system() {
     local ACTOR_LC=$(echo "$GH_ACTOR" | tr '[:upper:]' '[:lower:]')
     local OWNER_LC=$(echo "jqb69" | tr '[:upper:]' '[:lower:]')
 
+    # 1. Install Docker if missing
+    if ! [ -x "$(command -v docker)" ]; then
+        echo "📦 Docker not found. Installing..."
+        curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+    fi
+
+    # 2. Handle Docker Compose (V1 or V2)
+    if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+        DOCKER_COMPOSE_CMD="docker compose"
+        echo "✅ Found Docker Compose V2"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+        echo "✅ Found Docker Compose V1"
+    else
+        echo "📦 Docker Compose not found. Installing V2 Plugin..."
+        # Note: apt-get update might fail if not sudo/root, 
+        # but since this is a Droplet, you're likely root.
+        sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+        DOCKER_COMPOSE_CMD="docker compose"
+    fi
+    
+    export DOCKER_COMPOSE_CMD
     echo "🔑 Attempting Multi-Stage Authentication..."
 
     # Attempt 1: Using the Actor (jqb69)
@@ -81,8 +103,9 @@ deploy_openclaw() {
     cd "$(dirname "$0")/.." 
     
     echo "🏗️ Step 4: Orchestrating with Docker Compose..."
-    docker-compose pull
-    docker-compose up -d --remove-orphans --force-recreate
+    # Use the variable we defined in check_system
+    $DOCKER_COMPOSE_CMD pull
+    $DOCKER_COMPOSE_CMD up -d --remove-orphans --force-recreate
 }
 
 deploy_containers() {
