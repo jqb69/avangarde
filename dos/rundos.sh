@@ -20,16 +20,16 @@ load_env() {
     # STRIP HIDDEN CHARACTERS from the token immediately
     CLEAN_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')
 
-    echo "🔄 Overwriting .env with fresh secrets..."
+    echo "📂 Step 1: Handling Environment..."
+    # Now we write .env directly to the root (~/avangarde/.env)
     {
         echo "TG_SESSION_STR=${TG_SESSION_STR}"
         echo "TG_API_ID=${TG_API_ID}"
         echo "TG_API_HASH=${TG_API_HASH}"
-        echo "IMAGE_NAME=${IMAGE_NAME}"
-        echo "GH_TOKEN=${CLEAN_TOKEN}"
+        echo "GH_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')"
         echo "GH_ACTOR=${GH_ACTOR}"
-        echo "REDIS_URL=redis://127.0.0.1:6379/0"
-    } > "$ENV_FILE"
+        echo "IMAGE_NAME=${IMAGE_NAME}"
+    } > $ENV_FILE
     
     chmod 600 "$ENV_FILE"
     echo "✅ .env updated successfully."
@@ -96,30 +96,25 @@ check_system() {
 
 deploy_openclaw() {
     echo "🧹 Step 3: Cleaning up legacy manual containers..."
+    # Kill old standalone containers if they exist
     docker stop openclaw-agent openclaw-api claw-redis 2>/dev/null || true
     docker rm openclaw-agent openclaw-api claw-redis 2>/dev/null || true
 
-    # Move from ~/avangarde/dos up to ~/avangarde
-    cd "$(dirname "$0")/.." 
-    
-    # DEFINE THE PATH HERE
-    # Since we just moved UP, the .env is now inside the 'dos' folder
-    local ENV_PATH="./dos/.env"
-
     echo "📍 Working Directory: $(pwd)"
-    echo "📄 Using Env File: $ENV_PATH"
     
-    if [ ! -f "$ENV_PATH" ]; then
-        echo "❌ ERROR: .env not found at $ENV_PATH"
-        ls -la ./dos/
+    # Verify the compose file is actually here before trying to run it
+    if [ ! -f "docker-compose.yml" ]; then
+        echo "❌ ERROR: docker-compose.yml not found in $(pwd)"
+        ls -la
         exit 1
     fi
     
     echo "🏗️ Step 4: Orchestrating with $DOCKER_COMPOSE_CMD..."
     
-    # You MUST pass the --env-file flag to both pull and up
-    $DOCKER_COMPOSE_CMD --env-file "$ENV_PATH" pull
-    $DOCKER_COMPOSE_CMD --env-file "$ENV_PATH" up -d --remove-orphans --force-recreate
+    # Since .env is in this root folder, Docker Compose picks it up automatically.
+    # No --env-file flag needed if the file is named exactly '.env'
+    $DOCKER_COMPOSE_CMD pull
+    $DOCKER_COMPOSE_CMD up -d --remove-orphans --force-recreate
 }
 
 deploy_containers() {
@@ -163,6 +158,8 @@ cleanup() {
 # --- Main Logic Loop ---
 
 main() {
+    ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    cd "$ROOT_DIR"
     echo "🏁 Starting Deployment..."
     
     load_env
