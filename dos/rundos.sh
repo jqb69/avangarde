@@ -99,16 +99,9 @@ deploy_openclaw() {
     
     # 1. Find all container IDs that match 'avangarde' or 'redis'
     # 2. Stop and remove them regardless of their current name
-    local CONFLICTING_CONTAINERS=$(docker ps -a --format "{{.Names}}" | grep -E 'avangarde|redis|openclaw' || true)
+    docker stop ***-agent ***-api ***-redis 2>/dev/null || true
+    docker rm ***-agent ***-api ***-redis 2>/dev/null || true
     
-    if [ -n "$CONFLICTING_CONTAINERS" ]; then
-        echo "found conflicting containers: $CONFLICTING_CONTAINERS"
-        docker stop $CONFLICTING_CONTAINERS 2>/dev/null || true
-        docker rm -f $CONFLICTING_CONTAINERS 2>/dev/null || true
-        echo "✅ Cleanup complete."
-    else
-        echo "🔎 No conflicting containers found."
-    fi
 
     echo "📍 Working Directory: $(pwd)"
     
