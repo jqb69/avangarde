@@ -95,14 +95,23 @@ check_system() {
 }
 
 deploy_openclaw() {
-    echo "🧹 Step 3: Cleaning up legacy manual containers..."
-    # Kill old standalone containers if they exist
-    docker stop openclaw-agent openclaw-api claw-redis 2>/dev/null || true
-    docker rm openclaw-agent openclaw-api claw-redis 2>/dev/null || true
+    echo "🧹 Step 3: Nuclear cleanup of all project containers..."
+    
+    # 1. Find all container IDs that match 'avangarde' or 'redis'
+    # 2. Stop and remove them regardless of their current name
+    local CONFLICTING_CONTAINERS=$(docker ps -a --format "{{.Names}}" | grep -E 'avangarde|redis|openclaw' || true)
+    
+    if [ -n "$CONFLICTING_CONTAINERS" ]; then
+        echo "found conflicting containers: $CONFLICTING_CONTAINERS"
+        docker stop $CONFLICTING_CONTAINERS 2>/dev/null || true
+        docker rm -f $CONFLICTING_CONTAINERS 2>/dev/null || true
+        echo "✅ Cleanup complete."
+    else
+        echo "🔎 No conflicting containers found."
+    fi
 
     echo "📍 Working Directory: $(pwd)"
     
-    # Verify the compose file is actually here before trying to run it
     if [ ! -f "docker-compose.yml" ]; then
         echo "❌ ERROR: docker-compose.yml not found in $(pwd)"
         ls -la
@@ -110,9 +119,6 @@ deploy_openclaw() {
     fi
     
     echo "🏗️ Step 4: Orchestrating with $DOCKER_COMPOSE_CMD..."
-    
-    # Since .env is in this root folder, Docker Compose picks it up automatically.
-    # No --env-file flag needed if the file is named exactly '.env'
     $DOCKER_COMPOSE_CMD pull
     $DOCKER_COMPOSE_CMD up -d --remove-orphans --force-recreate
 }
