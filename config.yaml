@@ -1,0 +1,11 @@
+# avangarde/config.yaml
+app:
+  name: "OpenClaw"
+  environment: "production"
+
+llm:
+  primary: "deepseek"
+  fallback: "kimi"
+  circuit_breaker:
+    max_failures: 3
+    lockout_seconds: 30
