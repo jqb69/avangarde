@@ -3,14 +3,17 @@ import os
 
 class Vault:
     @staticmethod
-    def get_api_key(provider_name: str) -> str:
-        key_map = {
-            "deepseek": "DEEPSEEK_API_KEY",
-            "kimi": "KIMI_API_KEY",
-            "telegram": "TG_API_ID"
+    def get(key: str) -> str:
+        # Map logical names to environment variable names
+        mapping = {
+            "DEEPSEEK_KEY": "DEEPSEEK_API_KEY",
+            "KIMI_KEY": "KIMI_API_KEY",
+            "TG_ID": "TG_API_ID",
+            "TG_HASH": "TG_API_HASH",
+            "TG_SESSION": "TG_SESSION_STR"
         }
-        env_var = key_map.get(provider_name.lower())
+        env_var = mapping.get(key.upper())
         val = os.getenv(env_var)
         if not val:
-            raise EnvironmentError(f"❌ Missing Secret: {env_var}")
+            raise EnvironmentError(f"❌ SECRET MISSING: {key} (Check your .env)")
         return val.strip()
