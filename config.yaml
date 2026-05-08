@@ -2,7 +2,12 @@
 app:
   name: "Avangarde"
   version: "1.0.0"
-
+  
+mt5:
+  relay_url: "http://192.168.1.50:5000/trade"
+  timeout: 1.5   # Kill the trade attempt if no response in 1.5s
+  retries: 0     # In sniping, you usually don't retry; the entry is gone
+  
 llm:
   primary: "deepseek"
   fallback: "kimi"
