@@ -1,11 +1,22 @@
 # avangarde/config.yaml
 app:
-  name: "OpenClaw"
-  environment: "production"
+  name: "Avangarde"
+  version: "1.0.0"
 
 llm:
   primary: "deepseek"
   fallback: "kimi"
   circuit_breaker:
     max_failures: 3
-    lockout_seconds: 30
+    lockout_seconds: 60
+
+trading:
+  assets: ["BTC", "ETH", "XAUUSD", "EURUSD"]
+  risk:
+    max_drawdown: 0.05
+    max_position_size: 0.5 # Lots
+    confidence_threshold: 0.85
+
+ingestors:
+  telegram:
+    channels: [-100123456789] # List of IDs
