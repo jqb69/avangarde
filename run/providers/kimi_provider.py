@@ -1,21 +1,17 @@
 # providers/kimi_provider.py
 
-from openai import OpenAI
+import requests
+import json
 from typing import Dict, Optional
 from providers.base import BaseLLMProvider
 from utils.vault import Vault
 
 class KimiProvider(BaseLLMProvider):
-    
-    
+   
     def __init__(self, config: Dict):
         self.config = config
-        api_key = Vault.get("KIMI_KEY")
-        
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.moonshot.cn/v1"
-        )
+        self.api_key = Vault.get("KIMI_KEY")
+        self.base_url = "https://api.moonshot.cn/v1/chat/completions"
         # Typical models: moonshot-v1-8k, moonshot-v1-32k
         self.model = config.get("model", "moonshot-v1-8k")
 
@@ -33,12 +29,31 @@ class KimiProvider(BaseLLMProvider):
             
         messages.append({"role": "user", "content": f"Analyze this data: {data}"})
 
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.3
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.3
+            # Using requests instead of openai package
+            response = requests.post(
+                self.base_url,
+                headers=headers,
+                data=json.dumps(payload),
+                timeout=15.0
             )
-            return response.choices[0].message.content
+            
+            if response.status_code != 200:
+                raise RuntimeError(f"Kimi API Error: {response.status_code} - {response.text}")
+                
+            result = response.json()
+            return result['choices'][0]['message']['content']
+            
         except Exception as e:
             raise RuntimeError(f"Kimi Provider Error: {e}")
