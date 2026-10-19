@@ -3,23 +3,25 @@ import time
 from typing import Dict, Any, Optional
 from providers.deepseek_provider import DeepSeekProvider
 from providers.kimi_provider import KimiProvider
+from providers.ollama_provider import OllamaProvider
 
 class LLMRouter:
     def __init__(self, config: Dict[str, Any]):
         # Pull the 'llm' block from config.yaml
         self.llm_cfg = config.get('llm', {})
         
-        self.primary_name = self.llm_cfg.get('primary', 'deepseek')
-        self.fallback_name = self.llm_cfg.get('fallback', 'kimi')
+        self.primary_name = self.llm_cfg.get('primary', 'ollama')
+        self.fallback_name = self.llm_cfg.get('fallback', 'deepseek')
         
         cb_config = self.llm_cfg.get('circuit_breaker', {})
-        self.max_failures = cb_config.get('max_failures', 3)
+        self.max_failures = cb_config.get('max_failures', 5)
         self.lockout_time = cb_config.get('lockout_seconds', 30)
         
         self.circuit = {"failures": 0, "open_until": 0}
         
         # Initialize providers once with their specific configs
         self.providers = {
+            "ollama": OllamaProvider(self.llm_cfg.get("ollama", {})),
             'deepseek': DeepSeekProvider(self.llm_cfg.get('deepseek', {})),
             'kimi': KimiProvider(self.llm_cfg.get('kimi', {}))
         }
@@ -58,3 +60,4 @@ class LLMRouter:
             if self.circuit["failures"] >= self.max_failures:
                 self.circuit["open_until"] = time.time() + self.lockout_time
             raise e
+          
