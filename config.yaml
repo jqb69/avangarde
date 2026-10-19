@@ -9,8 +9,12 @@ mt5:
   retries: 0     # In sniping, you usually don't retry; the entry is gone
   
 llm:
-  primary: "deepseek"
-  fallback: "kimi"
+  primary: "ollama"
+  fallback: "deepseek"
+  ollama:
+    base_url: "http://157.245.193.221:11434"
+    model: "qwen2.5:7b"
+    timeout: 60
   circuit_breaker:
     max_failures: 3
     lockout_seconds: 60
