@@ -14,7 +14,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - MODE=api
-      # Since we are on host network, Redis is at localhost
       - REDIS_URL=redis://127.0.0.1:6379/0
 
   openclaw-agent:
