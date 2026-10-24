@@ -1,6 +1,5 @@
 ---
 # docker-compose.yaml
-version: '3.8'
 
 services:
   openclaw-api:
@@ -15,6 +14,9 @@ services:
       - PYTHONUNBUFFERED=1
       - MODE=api
       - REDIS_URL=redis://127.0.0.1:6379/0
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+  
 
   openclaw-agent:
     image: ${IMAGE_NAME}
@@ -29,6 +31,8 @@ services:
       - PYTHONUNBUFFERED=1
       - MODE=agent
       - REDIS_URL=redis://127.0.0.1:6379/0
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro  
 
   redis:
     image: redis:7-alpine
@@ -36,6 +40,7 @@ services:
     restart: always
     # MUST BE HOST MODE TOO
     network_mode: "host" 
+    command: ["redis-server", "--appendonly", "yes"]
     # 'ports' is useless in host mode, so we drop it to keep it clean
     volumes:
       - redis_data:/data
