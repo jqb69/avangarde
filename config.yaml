@@ -12,9 +12,12 @@ llm:
   primary: "ollama"
   fallback: "deepseek"
   ollama:
-    base_url: "http://157.245.193.221:11434"
+    base_url: "http://157.245.193.221:11434"   # Ollama droplet
     model: "qwen2.5:7b"
     timeout: 60
+  deepseek:
+    model: "deepseek-chat"
+    timeout: 15
   circuit_breaker:
     max_failures: 3
     lockout_seconds: 60
