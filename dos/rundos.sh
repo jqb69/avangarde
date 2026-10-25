@@ -94,6 +94,37 @@ check_system() {
     fi
 }
 
+deploy_config_yaml() {
+    local staged="${ROOT_DIR}/config.yaml"
+    local live="${ROOT_DIR}/config.yaml"
+    local stamp="${ROOT_DIR}/.config.yaml.deployed_mtime"
+
+    if [[ ! -f "$staged" ]]; then
+        echo "⚠️ No config.yaml in $ROOT_DIR — skip"
+        return 0
+    fi
+
+    if [[ ! -f "$live" ]]; then
+        chmod 644 "$staged"
+        stat -c %Y "$staged" > "$stamp" 2>/dev/null || stat -f %m "$staged" > "$stamp"
+        echo "✅ config.yaml installed (missing)"
+        return 0
+    fi
+
+    local src_m dst_m
+    src_m=$(stat -c %Y "$staged" 2>/dev/null || stat -f %m "$staged")
+    dst_m=$(cat "$stamp" 2>/dev/null || echo 0)
+
+    if [[ "$src_m" -gt "$dst_m" ]]; then
+        # staged was replaced by SCP with a newer file
+        chmod 644 "$staged"
+        echo "$src_m" > "$stamp"
+        echo "✅ config.yaml refreshed from deploy bundle"
+    else
+        echo "✓ config.yaml kept (not newer than last deploy)"
+    fi
+}
+
 deploy_openclaw() {
     echo "🧹 Step 3: Nuclear cleanup of all project containers..."
     
@@ -163,6 +194,7 @@ main() {
     
     load_env
     check_system
+    deploy_config_yaml
     #deploy_redis
     deploy_openclaw
     cleanup
