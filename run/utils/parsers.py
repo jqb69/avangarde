@@ -10,7 +10,7 @@ def extract_json(text: str) -> dict:
     """Extract and parse a JSON object from text."""
     if not text:
         return {}
-    # luk!!!!!!
+    
     match = re.search(
         r"```(?:json)?\s*(.*?)\s*```",
         text,
