@@ -1,4 +1,5 @@
 # core/risk_manager.py
+from typing import Dict
 
 class RiskManager:
     def __init__(self, config):
