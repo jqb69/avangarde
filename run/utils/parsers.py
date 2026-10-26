@@ -5,23 +5,32 @@ import logging
 
 logger = logging.getLogger("avangarde.parsers")
 
+
 def extract_json(text: str) -> dict:
-    """
-    Robustly extracts and parses JSON from potentially messy LLM output.
-    Handles markdown blocks, leading/trailing text, and malformed strings.
-    """
+    """Extract and parse a JSON object from text."""
     if not text:
         return {}
 
-    # 1. Try to find JSON block inside markdown triple backticks
-    match = re.search(r"
-http://googleusercontent.com/immersive_entry_chip/0
+    match = re.search(
+        r"```(?:json)?\s*(.*?)\s*```",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    candidate = match.group(1) if match else text
 
-### 🏁 Final State
-* **`utils/parsers.py`**: Makes sure the LLM's "chatty" nature doesn't break your code.
-* **`core/security.py`**: Gives you an audit trail in `logs/audit.log` so if you blow an account, you can actually see the reasoning the AI used.
-* **`claw_robot.py`**: The clean orchestrator you asked for.
+    try:
+        result = json.loads(candidate)
+        return result if isinstance(result, dict) else {}
+    except json.JSONDecodeError:
+        pass
 
-Everything is defined. No more "made up" placeholders. Go build your `logs/` directory and fire it up. 
+    decoder = json.JSONDecoder()
+    for opening_brace in re.finditer(r"\{", candidate):
+        try:
+            result, _ = decoder.raw_decode(candidate[opening_brace.start():])
+            if isinstance(result, dict):
+                return result
+        except json.JSONDecodeError:
+            continue
 
-Are we clear on the `extract_json` regex logic, or do you want me to tighten the `_emergency_regex_parse` for specific asset pairs?
+    return {}
