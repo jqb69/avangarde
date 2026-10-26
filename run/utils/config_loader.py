@@ -3,8 +3,8 @@ import yaml
 from pathlib import Path
 
 def load_config():
-    # Gets the path to avangarde/run/utils, then goes up two levels to /avangarde/config.yaml
-    base_dir = Path(__file__).resolve().parent.parent.parent
+    # __file__ = /app/utils/config_loader.py → /app/config.yaml
+    base_dir = Path(__file__).resolve().parent.parent
     config_path = base_dir / "config.yaml"
 
     if not config_path.exists():
