@@ -19,6 +19,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Syntax Gate
+        run: |
+          python -m compileall -q run/ || {
+            echo "Syntax error under run/ — refusing to deploy"
+            exit 1
+          }
+
       - name: Run Tests
         env:
           TG_SESSION_STR: "test_mode"
@@ -50,6 +58,9 @@ jobs:
           if [ -z "${{ secrets.DIGITAL_OCEAN_SSH_KEY }}" ]; then echo "Missing SSH Key"; exit 1; fi
           if [ -z "${{ secrets.TG_SESSION_STR }}" ]; then echo "Missing Telegram Session"; exit 1; fi
           # Add others as needed
+ 
+      - name: Syntax Gate (pre-build)
+        run: python -m compileall -q run/ || (echo "Syntax error — refusing image build" && exit 1)
 
       - name: Build and Push
         uses: docker/build-push-action@v5
