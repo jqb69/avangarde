@@ -126,58 +126,51 @@ deploy_config_yaml() {
 }
 
 deploy_openclaw() {
-    echo "🧹 Step 3: Nuclear cleanup of all project containers..."
-    
-    # 1. Find all container IDs that match 'avangarde' or 'redis'
-    # 2. Stop and remove them regardless of their current name
-    docker stop ***-agent ***-api ***-redis 2>/dev/null || true
-    docker rm ***-agent ***-api ***-redis 2>/dev/null || true
-    
-
     echo "📍 Working Directory: $(pwd)"
-    
-    if [ ! -f "docker-compose.yml" ]; then
-        echo "❌ ERROR: docker-compose.yml not found in $(pwd)"
-        ls -la
+    local ROOT_DIR
+    ROOT_DIR="$(pwd)"
+
+    if [[ ! -f "docker-compose.yml" ]]; then
+        echo "❌ docker-compose.yml missing in $ROOT_DIR"
         exit 1
     fi
-    
-    echo "🏗️ Step 4: Orchestrating with $DOCKER_COMPOSE_CMD..."
+
+    docker pull "${IMAGE_NAME}"
+
+    # 1) Image must import yaml + parsers (catches stale GHCR)
+    if ! docker run --rm --entrypoint python "${IMAGE_NAME}" \
+        -c "import yaml; import utils.parsers; print('image_ok')"; then
+        echo "❌ Pulled image failed import check — STALE_OR_BAD_IMAGE"
+        exit 1
+    fi
+
+    # 2) Config must load with the same mount compose uses
+    if [[ ! -f "${ROOT_DIR}/config.yaml" ]]; then
+        echo "❌ ${ROOT_DIR}/config.yaml missing — SCP/deploy did not deliver it"
+        exit 1
+    fi
+    if ! docker run --rm \
+        -v "${ROOT_DIR}/config.yaml:/app/config.yaml:ro" \
+        --entrypoint python "${IMAGE_NAME}" \
+        -c "import utils.config_loader; print('config_ok')"; then
+        echo "❌ Image cannot load mounted config.yaml — abort"
+        exit 1
+    fi
+
+    docker stop openclaw-agent openclaw-api openclaw-redis 2>/dev/null || true
+    docker rm openclaw-agent openclaw-api openclaw-redis 2>/dev/null || true
+
+    if [[ "${WIPE_REDIS:-0}" == "1" ]]; then
+        echo "🧹 WIPE_REDIS=1 — removing avangarde_redis_data"
+        docker volume rm avangarde_redis_data 2>/dev/null || true
+    fi
+
     $DOCKER_COMPOSE_CMD pull
     $DOCKER_COMPOSE_CMD up -d --remove-orphans --force-recreate
 }
 
-deploy_containers() {
-    echo "🚀 Step 4: Deploying OpenClaw..."
-    
-    # Always pull the latest image before restarting
-    docker pull "$IMAGE_NAME"
 
-    # --- Start Sniper Agent ---
-    echo "🎯 Refreshing Sniper Agent..."
-    docker stop openclaw-agent 2>/dev/null || true
-    docker rm openclaw-agent 2>/dev/null || true
-    docker run -d \
-      --name openclaw-agent \
-      --env MODE=agent \
-      --env-file "$ENV_FILE" \
-      --network host \
-      --restart unless-stopped \
-      "$IMAGE_NAME" python3 main.py
 
-    # --- Start Web API ---
-    echo "🌐 Refreshing Web API..."
-    docker stop openclaw-api 2>/dev/null || true
-    docker rm openclaw-api 2>/dev/null || true
-    docker run -d \
-      --name openclaw-api \
-      --env MODE=api \
-      --env-file "$ENV_FILE" \
-      --network host \
-      -p 80:80 \
-      --restart unless-stopped \
-      "$IMAGE_NAME" gunicorn -w 4 -b 0.0.0.0:80 main:app
-}
 
 cleanup() {
     echo "🧹 Step 5: Post-Deployment Cleanup..."
@@ -194,7 +187,7 @@ main() {
     
     load_env
     check_system
-    deploy_config_yaml
+    #deploy_config_yaml
     #deploy_redis
     deploy_openclaw
     cleanup
