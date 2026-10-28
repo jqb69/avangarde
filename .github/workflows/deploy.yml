@@ -68,9 +68,19 @@ jobs:
           context: .
           push: true
           file: run/Dockerfile
-          tags: ghcr.io/${{ github.repository_owner }}/avangarde:latest
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/avangarde:latest
+            ghcr.io/${{ github.repository_owner }}/avangarde:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+   
+      - name: Verify image imports
+        run: |
+          docker pull ghcr.io/${{ github.repository_owner }}/avangarde:latest
+          docker run --rm --entrypoint python \
+            ghcr.io/${{ github.repository_owner }}/avangarde:latest \
+            -c "import yaml; import utils.parsers; print('ci_image_ok')"
+
 
       - name: Copy deployment scripts to Droplet
         uses: appleboy/scp-action@v0.1.7
@@ -91,11 +101,12 @@ jobs:
           IMAGE_NAME: "ghcr.io/${{ github.repository_owner }}/avangarde:latest"
           GH_TOKEN: ${{ secrets.GH_PAT }}
           GH_ACTOR: ${{ github.actor }}
+          WIPE_REDIS: "0"   # set "1" only when redis RDB is corrupt
         with:
           host: ${{ secrets.DIGITAL_OCEAN_IP }}
           username: ${{ secrets.DIGITAL_OCEAN_USER }}
           key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-          envs: TG_SESSION_STR,TG_API_HASH,TG_API_ID,IMAGE_NAME,GH_TOKEN,GH_ACTOR
+          envs: TG_SESSION_STR,TG_API_HASH,TG_API_ID,IMAGE_NAME,GH_TOKEN,GH_ACTOR,WIPE_REDIS
           script: |
             chmod +x ~/avangarde/dos/rundos.sh
             ~/avangarde/dos/rundos.sh
