@@ -15,7 +15,7 @@ load_env() {
     
     # Lowercase the actor name for the image path
     local ACTOR_LOWER=$(echo "$GH_ACTOR" | tr '[:upper:]' '[:lower:]')
-    export IMAGE_NAME="ghcr.io/${ACTOR_LOWER}/avangarde:${{ github.sha }}"
+    export IMAGE_NAME="${IMAGE_NAME:-ghcr.io/${ACTOR_LOWER}/avangarde:latest}"
 
     # STRIP HIDDEN CHARACTERS from the token immediately
     CLEAN_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')
