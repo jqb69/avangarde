@@ -39,6 +39,36 @@ load_env() {
     set -a; source "$ENV_FILE"; set +a
 }
 
+check_required_env() {
+    echo "🔐 Checking required API keys in environment / .env..."
+    local missing=0
+
+    # Names only — never echo values
+    require_nonempty() {
+        local name="$1"
+        local val="${!name:-}"
+        if [[ -z "$val" ]]; then
+            echo "❌ MISSING: $name"
+            missing=1
+        else
+            echo "✓ $name present (len=${#val})"
+        fi
+    }
+
+    require_nonempty TG_SESSION_STR
+    require_nonempty TG_API_ID
+    require_nonempty TG_API_HASH
+    require_nonempty DEEPSEEK_API_KEY
+    # optional:
+    # require_nonempty KIMI_API_KEY
+
+    if [[ "$missing" -ne 0 ]]; then
+        echo "❌ Abort: required keys missing. Fix GitHub secrets + load_env → .env"
+        exit 1
+    fi
+    echo "✅ Required keys present"
+}
+
 check_system() {
     echo "🔍 Step 2: System Integrity Check..."
     
@@ -187,10 +217,12 @@ main() {
     echo "🏁 Starting Deployment..."
     
     load_env
+    check_required_env
     check_system
+    deploy_openclaw
+    
     #deploy_config_yaml
     #deploy_redis
-    deploy_openclaw
     cleanup
     echo "=============================================="
     echo "🎉 SUCCESS: Compose stack is up and running."
