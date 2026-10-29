@@ -26,10 +26,11 @@ load_env() {
         echo "TG_SESSION_STR=${TG_SESSION_STR}"
         echo "TG_API_ID=${TG_API_ID}"
         echo "TG_API_HASH=${TG_API_HASH}"
+        echo "DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}"
         echo "GH_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')"
         echo "GH_ACTOR=${GH_ACTOR}"
         echo "IMAGE_NAME=${IMAGE_NAME}"
-    } > $ENV_FILE
+    } > "$ENV_FILE"
     
     chmod 600 "$ENV_FILE"
     echo "✅ .env updated successfully."
