@@ -10,7 +10,9 @@ class KimiProvider(BaseLLMProvider):
    
     def __init__(self, config: Dict):
         self.config = config
-        self.api_key = Vault.get("KIMI_KEY")
+        self.api_key = Vault.get("KIMI_KEY", default="")
+        if not self.api_key:
+            logger.warning("No KIMI_API_KEY found — Kimi provider disabled")
         self.base_url = "https://api.moonshot.cn/v1/chat/completions"
         # Typical models: moonshot-v1-8k, moonshot-v1-32k
         self.model = config.get("model", "moonshot-v1-8k")
