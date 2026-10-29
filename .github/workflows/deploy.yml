@@ -57,7 +57,7 @@ jobs:
           if [ -z "${{ secrets.DIGITAL_OCEAN_IP }}" ]; then echo "Missing IP"; exit 1; fi
           if [ -z "${{ secrets.DIGITAL_OCEAN_SSH_KEY }}" ]; then echo "Missing SSH Key"; exit 1; fi
           if [ -z "${{ secrets.TG_SESSION_STR }}" ]; then echo "Missing Telegram Session"; exit 1; fi
-          # Add others as needed
+          if [ -z "${{ secrets.DEEPSEEK_API_KEY }}" ]; then echo "Missing DEEPSEEK_API_KEY"; exit 1; fi
  
       - name: Syntax Gate (pre-build)
         run: python -m compileall -q run/ || (echo "Syntax error — refusing image build" && exit 1)
@@ -98,15 +98,16 @@ jobs:
           TG_SESSION_STR: ${{ secrets.TG_SESSION_STR }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_API_ID: ${{ secrets.TG_API_ID }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           IMAGE_NAME: "ghcr.io/${{ github.repository_owner }}/avangarde:latest"
           GH_TOKEN: ${{ secrets.GH_PAT }}
           GH_ACTOR: ${{ github.actor }}
-          WIPE_REDIS: "0"   # set "1" only when redis RDB is corrupt
+          WIPE_REDIS: "0"
         with:
           host: ${{ secrets.DIGITAL_OCEAN_IP }}
           username: ${{ secrets.DIGITAL_OCEAN_USER }}
           key: ${{ secrets.DIGITAL_OCEAN_SSH_KEY }}
-          envs: TG_SESSION_STR,TG_API_HASH,TG_API_ID,IMAGE_NAME,GH_TOKEN,GH_ACTOR,WIPE_REDIS
+          envs: TG_SESSION_STR,TG_API_HASH,TG_API_ID,DEEPSEEK_API_KEY,IMAGE_NAME,GH_TOKEN,GH_ACTOR,WIPE_REDIS
           script: |
             chmod +x ~/avangarde/dos/rundos.sh
             ~/avangarde/dos/rundos.sh
