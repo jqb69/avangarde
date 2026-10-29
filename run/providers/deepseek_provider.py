@@ -14,7 +14,9 @@ class DeepSeekProvider(BaseLLMProvider):
     def __init__(self, config: Dict):
         self.config = config
         # Pulling from Vault - no hardcoded environment vars
-        self.api_key = Vault.get("DEEPSEEK_KEY")
+        self.api_key = Vault.get("DEEPSEEK_API_KEY", default="")
+        if not self.api_key:
+           logger.warning("No DEEPSEEK_API_KEY found — DeepSeek calls will fail until set")
         self.base_url = "https://api.deepseek.com/chat/completions"
         
         # 'deepseek-reasoner' for logic, 'deepseek-chat' for speed
