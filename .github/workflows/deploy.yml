@@ -102,9 +102,9 @@ jobs:
    
       - name: Verify image imports
         run: |
-          docker pull ghcr.io/${{ github.repository_owner }}/avangarde:latest
-          docker run --rm --entrypoint python \
-            ghcr.io/${{ github.repository_owner }}/avangarde:latest \
+          IMAGE="ghcr.io/${{ github.repository_owner }}/avangarde:${{ github.sha }}"
+          docker pull "$IMAGE"
+          docker run --rm --entrypoint python "$IMAGE" \
             -c "import yaml; import utils.parsers; print('ci_image_ok')"
 
 
@@ -125,7 +125,7 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_API_ID: ${{ secrets.TG_API_ID }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          IMAGE_NAME: "ghcr.io/${{ github.repository_owner }}/avangarde:latest"
+          IMAGE_NAME: "ghcr.io/${{ github.repository_owner }}/avangarde:${{ github.sha }}"
           GH_TOKEN: ${{ secrets.GH_PAT }}
           GH_ACTOR: ${{ github.actor }}
           WIPE_REDIS: "0"
