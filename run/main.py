@@ -15,7 +15,7 @@ from utils.vault import Vault
 from claw_robot import OpenClawRobot
 
 # 1. Initialization & Config
-REDIS_HOST = Vault.get("REDIS_HOST") if hasattr(Vault, 'get') else "localhost" # Fallback if Vault isn't fully configured for host yet
+REDIS_HOST = Vault.get("REDIS_HOST", "127.0.0.1") if hasattr(Vault, 'get') else "localhost" # Fallback if Vault isn't fully configured for host yet
 TG_API_ID = int(Vault.get("TG_ID"))
 TG_API_HASH = Vault.get("TG_HASH")
 TG_SESSION_STR = Vault.get("TG_SESSION")
