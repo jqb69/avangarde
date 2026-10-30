@@ -27,6 +27,7 @@ load_env() {
         echo "TG_API_ID=${TG_API_ID}"
         echo "TG_API_HASH=${TG_API_HASH}"
         echo "DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}"
+        echo "KIMI_API_KEY=${KIMI_API_KEY:-}"
         echo "GH_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')"
         echo "GH_ACTOR=${GH_ACTOR}"
         echo "IMAGE_NAME=${IMAGE_NAME}"
@@ -59,6 +60,7 @@ check_required_env() {
     require_nonempty TG_API_ID
     require_nonempty TG_API_HASH
     require_nonempty DEEPSEEK_API_KEY
+    require_nonempty KIMI_API_KEY
     # optional:
     # require_nonempty KIMI_API_KEY
 
