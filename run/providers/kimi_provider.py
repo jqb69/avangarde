@@ -13,9 +13,9 @@ class KimiProvider(BaseLLMProvider):
         self.api_key = Vault.get("KIMI_KEY", default="")
         if not self.api_key:
             logger.warning("No KIMI_API_KEY found — Kimi provider disabled")
-        self.base_url = "https://api.moonshot.cn/v1/chat/completions"
+        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
         # Typical models: moonshot-v1-8k, moonshot-v1-32k
-        self.model = config.get("model", "moonshot-v1-8k")
+        self.model = config.get("model", "moonshotai/kimi-k3k")
 
     def get_decision(self, data: str, context: Optional[Dict] = None) -> str:
         system_prompt = (
