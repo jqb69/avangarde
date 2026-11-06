@@ -8,6 +8,8 @@ from flask import Flask, jsonify, render_template
 from redis import Redis
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+import os 
+
 
 # Your custom logic imports
 from utils.config_loader import APP_CONFIG
@@ -96,11 +98,9 @@ if __name__ == "__main__":
     print(f"MODE={mode}")
 
     if mode == "api":
-        # Exclusive: dashboard + /health only
         run_flask()
 
     elif mode == "agent":
-        # No Flask — no port 80
         robot_thread = threading.Thread(target=run_robot, daemon=True)
         robot_thread.start()
         try:
@@ -109,7 +109,6 @@ if __name__ == "__main__":
             print("🛑 Shutting down...")
 
     else:
-        # Local dev: everything in one process
         flask_thread = threading.Thread(target=run_flask, daemon=True)
         flask_thread.start()
         robot_thread = threading.Thread(target=run_robot, daemon=True)
@@ -118,7 +117,3 @@ if __name__ == "__main__":
             asyncio.run(run_telegram())
         except KeyboardInterrupt:
             print("🛑 Shutting down...")
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("🛑 Shutting down...")
