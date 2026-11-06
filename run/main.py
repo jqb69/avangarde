@@ -71,37 +71,53 @@ def health():
 # --- CONCURRENCY MANAGEMENT ---
 
 def run_flask():
-    """Run Flask in a separate thread"""
-    app.run(host='0.0.0.0', port=80, debug=False, use_reloader=False)
+    port = int(os.getenv("PORT", "80"))
+    print(f"🌐 Flask listening on 0.0.0.0:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+
 
 def run_robot():
-    """Run the Orchestrator tick loop continuously"""
     print("🤖 Claw Robot Core Online.")
     while True:
         try:
             robot.tick()
         except Exception as e:
             print(f"⚠️ Robot Loop Error: {e}")
-        # Tiny sleep to prevent 100% CPU lockup when idle
         time.sleep(0.01)
-
-async def main():
-    """Run Telethon Client"""
+      
+async def run_telegram():
     print(f"🚀 Starting {APP_CONFIG['app']['name']} Ingestor...")
     await client.start()
     print("✅ Telegram Client Online & Listening.")
     await client.run_until_disconnected()
 
-if __name__ == '__main__':
-    # 1. Start Flask Thread (Dashboard & Health)
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
+if __name__ == "__main__":
+    mode = (os.getenv("MODE") or "all").strip().lower()
+    print(f"MODE={mode}")
 
-    # 2. Start Robot Thread (Filter -> LLM -> Risk -> Execute)
-    robot_thread = threading.Thread(target=run_robot, daemon=True)
-    robot_thread.start()
+    if mode == "api":
+        # Exclusive: dashboard + /health only
+        run_flask()
 
-    # 3. Start Telegram Loop (Main Thread)
+    elif mode == "agent":
+        # No Flask — no port 80
+        robot_thread = threading.Thread(target=run_robot, daemon=True)
+        robot_thread.start()
+        try:
+            asyncio.run(run_telegram())
+        except KeyboardInterrupt:
+            print("🛑 Shutting down...")
+
+    else:
+        # Local dev: everything in one process
+        flask_thread = threading.Thread(target=run_flask, daemon=True)
+        flask_thread.start()
+        robot_thread = threading.Thread(target=run_robot, daemon=True)
+        robot_thread.start()
+        try:
+            asyncio.run(run_telegram())
+        except KeyboardInterrupt:
+            print("🛑 Shutting down...")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
