@@ -12,32 +12,31 @@ ENV_FILE=".env"
 
 load_env() {
     echo "📂 Step 1: Handling Environment..."
-    
-    # Lowercase the actor name for the image path
-    local ACTOR_LOWER=$(echo "$GH_ACTOR" | tr '[:upper:]' '[:lower:]')
-    export IMAGE_NAME="${IMAGE_NAME:-ghcr.io/${ACTOR_LOWER}/avangarde:latest}"
+    local ACTOR_LOWER
+    ACTOR_LOWER=$(echo "${GH_ACTOR:-jqb69}" | tr '[:upper:]' '[:lower:]')
 
-    # STRIP HIDDEN CHARACTERS from the token immediately
-    CLEAN_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')
+    # Prefer IMAGE_NAME from appleboy env (full sha tag from deploy.yml)
+    if [[ -z "${IMAGE_NAME:-}" ]]; then
+        echo "⚠️ IMAGE_NAME unset — fallback to :latest (may be stale)"
+        export IMAGE_NAME="ghcr.io/${ACTOR_LOWER}/avangarde:latest"
+    fi
 
-    echo "📂 Step 1: Handling Environment..."
-    # Now we write .env directly to the root (~/avangarde/.env)
+    echo "📌 IMAGE_NAME=${IMAGE_NAME}"
+
+    CLEAN_TOKEN=$(echo "${GH_TOKEN:-}" | tr -d '[:space:]')
     {
         echo "TG_SESSION_STR=${TG_SESSION_STR}"
         echo "TG_API_ID=${TG_API_ID}"
         echo "TG_API_HASH=${TG_API_HASH}"
         echo "DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}"
         echo "KIMI_API_KEY=${KIMI_API_KEY:-}"
-        echo "GH_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')"
+        echo "GH_TOKEN=${CLEAN_TOKEN}"
         echo "GH_ACTOR=${GH_ACTOR}"
         echo "IMAGE_NAME=${IMAGE_NAME}"
     } > "$ENV_FILE"
-    
     chmod 600 "$ENV_FILE"
-    echo "✅ .env updated successfully."
-    
-    # Export for current shell and Docker Compose
     set -a; source "$ENV_FILE"; set +a
+    echo "✅ .env updated successfully."
 }
 
 check_required_env() {
@@ -170,7 +169,16 @@ deploy_openclaw() {
 
     docker pull "${IMAGE_NAME}"
 
-    # 1) Image must import yaml + parsers (catches stale GHCR)
+    echo "🔍 Image metadata:"
+    docker image inspect "${IMAGE_NAME}" --format 'Id={{.Id}} Created={{.Created}}'
+
+    # Must be MODE-aware main.py
+    if ! docker run --rm --entrypoint grep "${IMAGE_NAME}" -q 'MODE=' /app/main.py 2>/dev/null \
+       && ! docker run --rm --entrypoint grep "${IMAGE_NAME}" -q 'mode == "api"' /app/main.py; then
+        echo "❌ Image main.py has no MODE branch — STALE_IMAGE"
+        exit 1
+    fi
+
     if ! docker run --rm --entrypoint python "${IMAGE_NAME}" \
         -c "import yaml; import utils.parsers; print('image_ok')"; then
         echo "❌ Pulled image failed import check — STALE_OR_BAD_IMAGE"
