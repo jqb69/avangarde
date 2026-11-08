@@ -14,12 +14,20 @@ load_env() {
     echo "📂 Step 1: Handling Environment..."
     local ACTOR_LOWER
     ACTOR_LOWER=$(echo "${GH_ACTOR:-jqb69}" | tr '[:upper:]' '[:lower:]')
-
-    # Prefer IMAGE_NAME from appleboy env (full sha tag from deploy.yml)
     if [[ -z "${IMAGE_NAME:-}" ]]; then
-        echo "⚠️ IMAGE_NAME unset — fallback to :latest (may be stale)"
-        export IMAGE_NAME="ghcr.io/${ACTOR_LOWER}/avangarde:latest"
+        echo "❌ IMAGE_NAME unset (deploy must pass …:github.sha)"
+        exit 1
     fi
+
+    if [[ "${IMAGE_NAME}" == *:latest ]]; then
+        echo "❌ Refusing IMAGE_NAME=…:latest"
+        exit 1
+    fi
+    # Prefer IMAGE_NAME from appleboy env (full sha tag from deploy.yml)
+    #if [[ -z "${IMAGE_NAME:-}" ]]; then
+    #    echo "⚠️ IMAGE_NAME unset — fallback to :latest (may be stale)"
+    #   export IMAGE_NAME="ghcr.io/${ACTOR_LOWER}/avangarde:latest"
+    #fi
 
     echo "📌 IMAGE_NAME=${IMAGE_NAME}"
 
@@ -211,14 +219,11 @@ deploy_openclaw() {
 }
 
 
-
-
+# cleanup: drop unused images older than 5 days (keeps whatever is in use)
 cleanup() {
-    echo "🧹 Step 5: Post-Deployment Cleanup..."
-    # Remove old images to save disk space on the Droplet
-    docker image prune -f
+    echo "🧹 Prune unused images older than 5d..."
+    docker image prune -a -f --filter "until=120h" || true
 }
-
 # --- Main Logic Loop ---
 
 main() {
