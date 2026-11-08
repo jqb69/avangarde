@@ -96,12 +96,14 @@ async def run_telegram():
 
 if __name__ == "__main__":
     mode = (os.getenv("MODE") or "all").strip().lower()
-    print(f"MODE={mode}")
+    print(f"MODE={mode}", flush=True)
 
     if mode == "api":
+        print("role=api flask_only", flush=True)
         run_flask()
 
     elif mode == "agent":
+        print("role=agent robot+telegram no_flask", flush=True)
         robot_thread = threading.Thread(target=run_robot, daemon=True)
         robot_thread.start()
         try:
@@ -110,6 +112,7 @@ if __name__ == "__main__":
             print("🛑 Shutting down...")
 
     else:
+        print("role=all (legacy combined)", flush=True)
         flask_thread = threading.Thread(target=run_flask, daemon=True)
         flask_thread.start()
         robot_thread = threading.Thread(target=run_robot, daemon=True)
