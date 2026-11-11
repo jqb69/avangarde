@@ -10,12 +10,17 @@ from redis import Redis
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 
-
-
 # Your custom logic imports
 from utils.config_loader import APP_CONFIG
 from utils.vault import Vault
 from claw_robot import OpenClawRobot
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    force=True,          # override any earlier config
+)
 
 # 1. Initialization & Config
 REDIS_HOST = Vault.get("REDIS_HOST", "127.0.0.1") if hasattr(Vault, 'get') else "localhost" # Fallback if Vault isn't fully configured for host yet
