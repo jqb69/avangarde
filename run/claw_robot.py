@@ -78,6 +78,7 @@ class OpenClawRobot:
 
         try:
             # Run the trading pipeline
+            logger.info(f"▶ Starting pipeline for eid={eid[:8]}")
             self._execute_pipeline(eid, event, is_emergency)
 
             # Atomic Cleanup on Success
