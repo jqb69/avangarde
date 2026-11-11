@@ -71,7 +71,7 @@ class OpenClawRobot:
         
         if not event:
             return
-
+        logger.info(f"📥 Popped event (len={len(event)})")
         # Unique ID for this processing attempt
         eid = hashlib.md5(f"{event}{time.time()}".encode()).hexdigest()
         self.redis.hset(self.Q_PROC, eid, event)
