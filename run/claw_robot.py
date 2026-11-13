@@ -5,6 +5,8 @@ import hashlib
 import json
 import random
 from typing import Dict, Any
+import time
+import newsfeeder
 
 # Core Pipeline Imports
 from core.filter import NewsFilter
@@ -14,6 +16,7 @@ from core.security import SecurityManager
 from executors.mt5_relay import MT5Relay
 from utils.parsers import extract_json
 
+NEWS_INTERVAL = 60
 logger = logging.getLogger("avangarde.robot")
 
 class OpenClawRobot:
@@ -34,7 +37,8 @@ class OpenClawRobot:
         self.Q_RETRY = "retry_schedule"   
         self.Q_RDATA = "retry_data"       
         self.Q_DLQ = "dead_letter_queue"
-        
+        # news interval
+        self._last_news_at = time.monotonic() - NEWS_INTERVAL
         # 3. Setup Internal Logic
         self._init_lua_scripts()
 
@@ -60,10 +64,25 @@ class OpenClawRobot:
         return nil
         """
         self.lua_tick = self.redis.register_script(lua_script)
+      
+    def _maybe_fetch_news(self):
+        now = time.monotonic()
+        if now - self._last_news_at < NEWS_INTERVAL:
+            return
+    
+        self._last_news_at = now
+        try:
+            count = newsfeeder.fetch_and_push(self.redis)
+            if count:
+                logger.info("newsfeeder pushed %d items", count)
+        except Exception as e:
+            logger.warning("newsfeeder error: %s", e)
+
 
     def tick(self, is_emergency: bool = False):
         """Main Loop Cycle: Pull, Process, Cleanup."""
         # Atomic Pop (Priority: News > Retries)
+        self._maybe_fetch_news()
         event = self.lua_tick(
             keys=[self.Q_RETRY, self.Q_RDATA, self.Q_MAIN], 
             args=[time.time()]
@@ -75,7 +94,7 @@ class OpenClawRobot:
         # Unique ID for this processing attempt
         eid = hashlib.md5(f"{event}{time.time()}".encode()).hexdigest()
         self.redis.hset(self.Q_PROC, eid, event)
-
+        
         try:
             # Run the trading pipeline
             logger.info(f"▶ Starting pipeline for eid={eid[:8]}")
