@@ -18,5 +18,6 @@ aiohttp==3.9.5
 qrcode[pil]==8.2
 pillow==10.3.0
 feedparser
+pandas
 # --- Math & Logic ---
 numpy==1.26.4
