@@ -152,6 +152,23 @@ class OpenClawRobot:
         self.redis.ltrim("trade_history", 0, 99)
         logger.info(f"🚀 Trade Executed: {res['pair']} {res['decision']}")
 
+    def decide_from_event(self, event: str, price: float) -> Dict[str, Any]:
+        """
+        Same filter → brain path used live.
+        Returns {"side": "buy"|"sell"|"hold", "lots": float} for backtest.
+        """
+        if not self.filter.is_relevant(event):
+            return {"side": "hold", "lots": 0.0}
+    
+        raw_res = self.brain.get_decision(event, context=None, is_emergency=False)
+        res = extract_json(raw_res)
+        if not res or res.get("decision") in (None, "HOLD"):
+            return {"side": "hold", "lots": 0.0}
+    
+        side = "buy" if res["decision"] == "BUY" else "sell" if res["decision"] == "SELL" else "hold"
+        lots = float(res.get("lots", 0.01))
+        return {"side": side, "lots": lots}
+
     def _handle_failure(self, eid: str, event: str):
         """Manages exponential backoff retries for failed LLM/API calls."""
         count = int(self.redis.hget("retry_counts", eid) or 0) + 1
