@@ -15,6 +15,7 @@ from utils.config_loader import APP_CONFIG
 from utils.vault import Vault
 from claw_robot import OpenClawRobot
 import logging
+import backtest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,6 +77,20 @@ def health():
         "queue_depth": r.llen("breaking_news") # Add queue monitoring
     }), 200
 
+@app.route('/backtest', methods=['POST'])
+def run_backtest_endpoint():
+    data = request.get_json(force=True)
+    ohlc_path = data["ohlc_path"]
+    events_path = data["events_path"]
+    result = backtest.run(
+        ohlc_path=ohlc_path,
+        events_path=events_path,
+        decide_fn=robot.decide_from_event,   # same instance
+        initial_cash=float(data.get("cash", 10000)),
+        lookahead=int(data.get("lookahead", 1)),
+    )
+    return jsonify(result)
+
 # --- CONCURRENCY MANAGEMENT ---
 
 def run_flask():
@@ -92,7 +107,7 @@ def run_robot():
         except Exception as e:
             print(f"⚠️ Robot Loop Error: {e}")
         time.sleep(0.01)
-      
+  
 async def run_telegram():
     print(f"🚀 Starting {APP_CONFIG['app']['name']} Ingestor...")
     await client.start()
