@@ -77,18 +77,47 @@ def health():
         "queue_depth": r.llen("breaking_news") # Add queue monitoring
     }), 200
 
+@app.route('/test-dump')
+def test_dump():
+    """Quick check that breaking_news_archive has data."""
+    try:
+        events = backtest.dump_archive(r, hours=168)  # last 7 days
+        return jsonify({
+            "status": "ok",
+            "count": len(events),
+            "sample": events[:3] if events else [],
+            "oldest": events[0]["ts"] if events else None,
+            "newest": events[-1]["ts"] if events else None,
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "msg": str(e)}), 500
+
 @app.route('/backtest', methods=['POST'])
 def run_backtest_endpoint():
     data = request.get_json(force=True)
     ohlc_path = data["ohlc_path"]
-    events_path = data["events_path"]
-    result = backtest.run(
-        ohlc_path=ohlc_path,
-        events_path=events_path,
-        decide_fn=robot.decide_from_event,   # same instance
-        initial_cash=float(data.get("cash", 10000)),
-        lookahead=int(data.get("lookahead", 1)),
-    )
+    events_path = data.get("events_path")          # optional
+    hours = int(data.get("hours", 168))             # how far back to dump
+
+    if events_path:
+        result = backtest.run(
+            ohlc_path=ohlc_path,
+            events_path=events_path,
+            decide_fn=robot.decide_from_event,
+            initial_cash=float(data.get("cash", 10000)),
+            lookahead=int(data.get("lookahead", 1)),
+        )
+    else:
+        # no file → dump from Redis archive
+        events = backtest.dump_archive(r, hours=hours)
+        result = backtest.run(
+            ohlc_path=ohlc_path,
+            events=events,
+            decide_fn=robot.decide_from_event,
+            initial_cash=float(data.get("cash", 10000)),
+            lookahead=int(data.get("lookahead", 1)),
+        )
+
     return jsonify(result)
 
 # --- CONCURRENCY MANAGEMENT ---
