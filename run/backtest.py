@@ -177,6 +177,32 @@ def simulate(
     }
 
 
+def dump_breaking_news(r, key: str = "breaking_news") -> List[Dict]:
+    """Dump current contents of the Redis list (whatever is still there)."""
+    raw = r.lrange(key, 0, -1)
+    events = []
+    for item in reversed(raw):          # oldest first
+        text = item.decode() if isinstance(item, bytes) else item
+        events.append({
+            "ts": datetime.utcnow().isoformat() + "Z",
+            "text": text,
+        })
+    return events
+
+
+def dump_archive(r, hours: int = 24, key: str = "breaking_news_archive") -> List[Dict]:
+    """Dump from the 7-day archive sorted set (if you added it)."""
+    now = time.time()
+    cutoff = now - hours * 3600
+    items = r.zrangebyscore(key, cutoff, now, withscores=True)
+    return [
+        {
+            "ts": datetime.utcfromtimestamp(score).isoformat() + "Z",
+            "text": item.decode() if isinstance(item, bytes) else item,
+        }
+        for item, score in items
+    ]
+
 def run(
     ohlc_path: str,
     events_path: str = None,
