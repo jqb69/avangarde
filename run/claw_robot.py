@@ -94,7 +94,13 @@ class OpenClawRobot:
         # Unique ID for this processing attempt
         eid = hashlib.md5(f"{event}{time.time()}".encode()).hexdigest()
         self.redis.hset(self.Q_PROC, eid, event)
-        
+
+        # Archive for 7 days
+        # Archive for 7 days (only if not already present)
+        now = time.time()
+        self.redis.zadd("breaking_news_archive", {event: now}, nx=True)  # NX = don't recent score
+        self.redis.expire("breaking_news_archive", 7 * 24 * 3600)
+    
         try:
             # Run the trading pipeline
             logger.info(f"▶ Starting pipeline for eid={eid[:8]}")
