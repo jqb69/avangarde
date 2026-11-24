@@ -4,25 +4,68 @@ backtest.py — offline decision accuracy + simple PnL replay.
 Callable from main.py or Hermes. No MT5, no Redis, no standalone main.
 """
 import json
+from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 from typing import List, Dict, Any, Callable
-
+import yfinance as yf
 import pandas as pd
 
+def _yahoo_url_to_df(url: str) -> pd.DataFrame:
+    """Download OHLC from Yahoo history URL into a DataFrame (no file)."""
+    parsed = urlparse(url)
+    parts = [p for p in parsed.path.strip("/").split("/") if p]
+    try:
+        ticker = parts[parts.index("quote") + 1]
+    except (ValueError, IndexError):
+        raise ValueError("Could not find ticker in Yahoo URL")
 
-def load_ohlc(path: str) -> pd.DataFrame:
-    """Validate and load any CSV. Requires datetime index + open/high/low/close."""
-    p = Path(path)
+    params = parse_qs(parsed.query)
+    try:
+        start = datetime.fromtimestamp(int(params["period1"][0]), tz=timezone.utc).date().isoformat()
+        end = datetime.fromtimestamp(int(params["period2"][0]), tz=timezone.utc).date().isoformat()
+    except (KeyError, ValueError, IndexError):
+        raise ValueError("URL must contain valid period1 and period2")
+
+    data = yf.download(ticker, start=start, end=end, interval="1d",
+                       auto_adjust=False, progress=False)
+    if data.empty:
+        raise ValueError(f"No data for {ticker}")
+
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+    data.columns = [str(c).lower() for c in data.columns]
+    data.index.name = "datetime"
+
+    required = {"open", "high", "low", "close"}
+    if not required.issubset(data.columns):
+        raise ValueError(f"Yahoo data missing {required - set(data.columns)}")
+    return data[list(required)].sort_index()
+
+
+
+def load_ohlc(path_or_url: str) -> pd.DataFrame:
+    """
+    Accepts:
+      - local CSV path
+      - Yahoo Finance history URL (downloaded in memory)
+    """
+    if path_or_url.startswith(("http://", "https://")) and "yahoo" in path_or_url.lower():
+        return _yahoo_url_to_df(path_or_url)
+
+    # local file
+    p = Path(path_or_url)
     if not p.is_file():
-        raise FileNotFoundError(f"CSV not found: {path}")
+        raise FileNotFoundError(f"CSV not found: {path_or_url}")
     if p.suffix.lower() not in (".csv", ".txt"):
-        raise ValueError(f"Not a CSV: {path}")
+        raise ValueError(f"Not a CSV: {path_or_url}")
 
     df = pd.read_csv(p, parse_dates=["datetime"], index_col="datetime")
+    df.columns = [str(c).lower() for c in df.columns]
     required = {"open", "high", "low", "close"}
-    cols = {c.lower() for c in df.columns}
-    if not required.issubset(cols):
-        raise ValueError(f"CSV missing columns {required - cols}: {path}")
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"CSV missing columns: {missing}")
     return df.sort_index()
 
 
@@ -136,15 +179,30 @@ def simulate(
 
 def run(
     ohlc_path: str,
-    events_path: str,
-    decide_fn: Callable,
+    events_path: str = None,
+    events: List[Dict] = None,
+    decide_fn: Callable = None,
     initial_cash: float = 10000,
     lookahead: int = 1,
 ) -> Dict[str, Any]:
-    """One-shot entry used by main.py or Hermes."""
+    """
+    One-shot entry.
+    Provide either events_path or events.
+    decide_fn is required.
+    """
+    if decide_fn is None:
+        raise ValueError("decide_fn is required")
+
     ohlc = load_ohlc(ohlc_path)
-    events = load_events(events_path)
+
+    if events is not None:
+        loaded_events = events
+    elif events_path:
+        loaded_events = load_events(events_path)
+    else:
+        raise ValueError("Provide either events_path or events")
+
     return {
-        "accuracy": score_decisions(events, ohlc, decide_fn, lookahead),
-        "pnl": simulate(events, ohlc, decide_fn, initial_cash),
+        "accuracy": score_decisions(loaded_events, ohlc, decide_fn, lookahead),
+        "pnl": simulate(loaded_events, ohlc, decide_fn, initial_cash),
     }
