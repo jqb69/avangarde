@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlparse
 from typing import List, Dict, Any, Callable
 import yfinance as yf
 import pandas as pd
+import time
 
 def _yahoo_url_to_df(url: str) -> pd.DataFrame:
     """Download OHLC from Yahoo history URL into a DataFrame (no file)."""
